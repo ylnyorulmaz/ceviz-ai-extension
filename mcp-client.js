@@ -12,6 +12,18 @@ class MCPClient {
   }
 
   /**
+   * Helper to resolve active tab accurately even when Side Panel has focus
+   */
+  async getTargetTab() {
+    let [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (!tab || tab.url?.startsWith('chrome-extension://')) {
+      const allActive = await chrome.tabs.query({ active: true });
+      tab = allActive.find(t => !t.url?.startsWith('chrome-extension://')) || tab || allActive[0];
+    }
+    return tab;
+  }
+
+  /**
    * Registers default built-in browser tools available via activeTab
    */
   registerBuiltInTools() {
@@ -24,7 +36,7 @@ class MCPClient {
         required: []
       },
       handler: async () => {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = await this.getTargetTab();
         if (!tab) {
           return { error: 'Aktif sekme bulunamadı.' };
         }
@@ -38,7 +50,7 @@ class MCPClient {
 
     this.registerTool({
       name: 'get_page_content',
-      description: 'Extract raw text content from the currently active tab.',
+      description: 'Extract raw text content from the currently active web page tab.',
       parameters: {
         type: 'object',
         properties: {
@@ -51,7 +63,7 @@ class MCPClient {
       },
       handler: async (args) => {
         const maxLen = args?.maxLength || 4000;
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = await this.getTargetTab();
         if (!tab?.id) {
           return { error: 'Aktif sekme bulunamadı.' };
         }
@@ -59,7 +71,10 @@ class MCPClient {
         try {
           const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: () => document.body?.innerText || ''
+            func: () => {
+              const mainElem = document.querySelector('article, main, #content, .content, .post-content') || document.body;
+              return mainElem?.innerText || document.body?.innerText || '';
+            }
           });
 
           const text = results[0]?.result || '';
