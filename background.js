@@ -16,18 +16,10 @@ if (chrome.sidePanel?.setPanelBehavior) {
   });
 }
 
-const OPENROUTER_FREE_FALLBACKS = [
-  'google/gemma-4-31b-it:free',
-  'google/gemma-4-26b-a4b-it:free',
-  'z-ai/glm-5.2:free',
-  'google/gemini-2.0-flash-001'
-];
-
 const DEFAULT_SETTINGS = {
   activeProvider: 'openrouter',
   openrouterApiKey: '',
-  openrouterModel: 'google/gemma-4-31b-it:free',
-  openrouterFallbackModel: 'google/gemma-4-26b-a4b-it:free',
+  openrouterModel: 'google/gemini-2.0-flash-001',
   groqApiKey: '',
   groqModel: 'llama-3.3-70b-versatile'
 };
@@ -90,9 +82,9 @@ async function getSettings() {
 }
 
 /**
- * Perform completion request with tool use loop and fallback support
+ * Perform completion request with tool use loop
  */
-async function generateCompletion(messages, customProvider = null, targetModelOverride = null, attemptedModels = []) {
+async function generateCompletion(messages, customProvider = null, targetModelOverride = null) {
   const settings = await getSettings();
   const providerKey = customProvider || settings.activeProvider;
 
@@ -119,7 +111,7 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
   }
 
   const apiKey = providerKey === 'openrouter' ? settings.openrouterApiKey : settings.groqApiKey;
-  let model = targetModelOverride || (providerKey === 'openrouter' ? settings.openrouterModel : settings.groqModel);
+  const model = targetModelOverride || (providerKey === 'openrouter' ? settings.openrouterModel : settings.groqModel);
 
   if (!apiKey || !apiKey.trim()) {
     throw new Error(`🔑 ${config.name} API Key eksik. Lütfen Eklenti Seçenekleri (Ayarlar) sayfasından ${config.name} API anahtarınızı kaydedin.`);
@@ -152,27 +144,19 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
       detail = errJson.error?.message || errJson.message || errorText;
     } catch (e) {}
 
-    // Multi-level automatic fallback for OpenRouter (404 / Model unavailable / 429)
-    if (providerKey === 'openrouter' && response.status !== 401) {
-      const currentAttempted = [...attemptedModels, model];
-      const nextFallback = OPENROUTER_FREE_FALLBACKS.find(m => !currentAttempted.includes(m));
-
-      if (nextFallback) {
-        console.warn(`[OpenRouter] Model (${model}) failed (${response.status}: ${detail}). Trying fallback: ${nextFallback}...`);
-        return generateCompletion(messages, 'openrouter', nextFallback, currentAttempted);
-      }
-    }
-
     if (response.status === 401) {
-      throw new Error(`🔑 Yetkilendirme Başarısız (${config.name} 401): ${detail}. Lütfen API Anahtarınızı kontrol edin.`);
+      throw new Error(`🔑 Yetkilendirme Başarısız (${config.name} 401): ${detail}. Lütfen OpenRouter API Anahtarınızı kontrol edin.`);
     }
     if (response.status === 403) {
       throw new Error(`🚫 Erişim Engellendi (${config.name} 403): ${detail}. Lütfen bakiye ve izinlerinizi kontrol edin.`);
     }
-    if (response.status === 429) {
-      throw new Error(`⚠️ Kota / Hız Limiti Aşıldı (${config.name} 429): ${detail}. Lütfen biraz bekleyin.`);
+    if (response.status === 404) {
+      throw new Error(`🔍 Model veya Endpoint Bulunamadı (${config.name} 404 - Model: "${model}"): ${detail}. Lütfen Eklenti Ayarlarından aktif bir model seçin.`);
     }
-    throw new Error(`❌ ${config.name} API Hatası (${response.status}): ${detail}`);
+    if (response.status === 429) {
+      throw new Error(`⚠️ Kota / Hız Limiti Aşıldı (${config.name} 429 - Model: "${model}"): ${detail}. Lütfen biraz bekleyin.`);
+    }
+    throw new Error(`❌ ${config.name} API Hatası (${response.status} - Model: "${model}"): ${detail}`);
   }
 
   const result = await response.json();
@@ -205,7 +189,7 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
     }
 
     // Recursively resolve tool results with second API call
-    return generateCompletion(updatedMessages, providerKey, model, attemptedModels);
+    return generateCompletion(updatedMessages, providerKey, model);
   }
 
   return choiceMessage.content || '';
