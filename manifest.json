@@ -5,15 +5,18 @@
   "description": "Akıllı Web Asistanı",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "action": {
-    "default_title": "Ceviz.ai",
-    "default_popup": "popup.html"
+    "default_title": "Ceviz.ai"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
   },
   "options_ui": {
     "page": "options.html",
