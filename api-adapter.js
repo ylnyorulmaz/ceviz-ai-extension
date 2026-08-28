@@ -1022,6 +1022,14 @@
       // x-api-key is Anthropic-specific; sending it to OpenAI-compat providers causes 400 errors
     }
 
+    if (provider.id === 'openrouter' || (provider.baseUrl && provider.baseUrl.includes('openrouter.ai'))) {
+      if (provider.apiKey) {
+        headers.set('Authorization', `Bearer ${provider.apiKey}`);
+      }
+      headers.set('HTTP-Referer', 'https://github.com/ylnyorulmaz/ceviz-ai-extension');
+      headers.set('X-Title', 'Ceviz.ai Browser Extension');
+    }
+
     if (provider.transport === 'anthropic') {
       const upstreamUrl = `${String(provider.baseUrl || 'https://api.anthropic.com/v1').replace(/\/+$/, '')}/messages`;
       headers.delete('Authorization');
@@ -1274,8 +1282,15 @@
         ? input.url
         : String(input);
 
-    if (url.includes('api.anthropic.com')) {
-      if (url.includes('/v1/messages') && !url.includes('/batches')) {
+    const isAnthropicDomain = (
+      url.includes('api.anthropic.com') ||
+      url.includes('bridge.claudeusercontent.com') ||
+      url.includes('claudeusercontent.com') ||
+      url.includes('claude.ai')
+    );
+
+    if (isAnthropicDomain) {
+      if ((url.includes('/v1/messages') || url.includes('/messages')) && !url.includes('/batches')) {
         return proxyAnthropicMessages(input, init);
       }
 
