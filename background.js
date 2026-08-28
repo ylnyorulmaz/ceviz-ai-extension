@@ -1,8 +1,47 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * 100% Self-Contained Service Worker with Smart Provider Key Detection
+ * 100% Self-Contained Service Worker with Smart Auto Key Decryption
  */
+
+// --- CryptoVault Module (Inlined for 100% Decryption Reliability) ---
+class CryptoVault {
+  static async getDeviceKey() {
+    let { _vaultSeed } = await chrome.storage.local.get('_vaultSeed');
+    if (!_vaultSeed) {
+      const rawSeed = crypto.getRandomValues(new Uint8Array(32));
+      _vaultSeed = Array.from(rawSeed);
+      await chrome.storage.local.set({ _vaultSeed });
+    }
+    const seedBytes = new Uint8Array(_vaultSeed);
+    return crypto.subtle.importKey('raw', seedBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  }
+
+  static async encrypt(plaintext) {
+    if (!plaintext || typeof plaintext !== 'string') return '';
+    const key = await this.getDeviceKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoder = new TextEncoder();
+    const data = encoder.encode(plaintext);
+    const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+    return JSON.stringify({ v: 1, iv: Array.from(iv), ciphertext: Array.from(new Uint8Array(encrypted)) });
+  }
+
+  static async decrypt(encryptedPayload) {
+    if (!encryptedPayload || typeof encryptedPayload !== 'string') return '';
+    try {
+      const parsed = JSON.parse(encryptedPayload);
+      if (!parsed || !parsed.iv || !parsed.ciphertext) return encryptedPayload;
+      const key = await this.getDeviceKey();
+      const iv = new Uint8Array(parsed.iv);
+      const ciphertext = new Uint8Array(parsed.ciphertext);
+      const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+      return new TextDecoder().decode(decrypted);
+    } catch (e) {
+      return encryptedPayload;
+    }
+  }
+}
 
 // --- MCP Client Module (Inlined for 0-fetch reliability) ---
 class MCPClient {
@@ -201,16 +240,21 @@ async function getSettings() {
 }
 
 /**
- * Ensures key is a clean non-JSON string
+ * Safely decrypts or cleans key string
  */
-function sanitizeApiKey(val) {
+async function sanitizeApiKey(val) {
   if (!val || typeof val !== 'string') return '';
   let str = val.trim();
+
+  // If it's a JSON string from previous encryption, decrypt it back
   if (str.startsWith('{') && str.endsWith('}')) {
     try {
-      const parsed = JSON.parse(str);
-      if (parsed.v || parsed.iv) return '';
+      const decrypted = await CryptoVault.decrypt(str);
+      if (decrypted && typeof decrypted === 'string' && !decrypted.startsWith('{')) {
+        return decrypted.trim();
+      }
     } catch (e) {}
+    return '';
   }
   return str;
 }
@@ -238,7 +282,7 @@ async function executeChromeLocalAI(messages) {
  * Execute Supabase Edge Function with Gumroad License Authorization header
  */
 async function executeSupabaseRequest(messages, settings) {
-  const rawLicense = sanitizeApiKey(settings.gumroadLicenseKey);
+  const rawLicense = await sanitizeApiKey(settings.gumroadLicenseKey);
 
   if (!rawLicense) {
     throw new Error('🔑 Gumroad Lisans Anahtarı eksik. Lütfen Ceviz Pro lisans kodunuzu Eklenti Ayarlarından girip kaydedin.');
@@ -277,8 +321,8 @@ async function executeSupabaseRequest(messages, settings) {
  * Execute BYOK Request directly to OpenRouter or Groq with Smart Auto Provider Detection
  */
 async function executeBYOKRequest(messages, settings, targetModelOverride = null, attemptedModels = []) {
-  const openRouterKey = sanitizeApiKey(settings.openrouterApiKey);
-  const groqKey = sanitizeApiKey(settings.groqApiKey);
+  const openRouterKey = await sanitizeApiKey(settings.openrouterApiKey);
+  const groqKey = await sanitizeApiKey(settings.groqApiKey);
 
   // Smart Auto Provider Detection: Use whichever key is entered by user
   let providerKey = settings.byokProvider || 'openrouter';
@@ -436,9 +480,9 @@ async function smartRouteCompletion(messages) {
   const settings = await getSettings();
   const usageMode = settings.usageMode || 'byok';
 
-  const rawOpenRouterKey = sanitizeApiKey(settings.openrouterApiKey);
-  const rawGroqKey = sanitizeApiKey(settings.groqApiKey);
-  const rawGumroadKey = sanitizeApiKey(settings.gumroadLicenseKey);
+  const rawOpenRouterKey = await sanitizeApiKey(settings.openrouterApiKey);
+  const rawGroqKey = await sanitizeApiKey(settings.groqApiKey);
+  const rawGumroadKey = await sanitizeApiKey(settings.gumroadLicenseKey);
 
   const hasBYOK = !!(rawOpenRouterKey || rawGroqKey);
   const hasGumroad = !!rawGumroadKey;
