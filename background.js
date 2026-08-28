@@ -1,7 +1,7 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * 100% Self-Contained Service Worker with Scripting Timeout Protection
+ * 100% Self-Contained Service Worker with Infinite Tool Loop Fix
  */
 
 // --- CryptoVault Module (Inlined for 100% Decryption Reliability) ---
@@ -466,7 +466,8 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
       });
     }
 
-    return executeBYOKRequest(messages, settings, modelToUse, attemptedModels);
+    // Recursively call BYOK request with updatedMessages containing tool results
+    return executeBYOKRequest(updatedMessages, settings, modelToUse, attemptedModels);
   }
 
   return {
