@@ -2,7 +2,7 @@
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
  * Handles background operations, OpenRouter, Groq, and Chrome Local AI (Gemini Nano)
- * requests, sidePanel behavior, and MCP Client tool call loops.
+ * requests, sidePanel behavior, MCP Client tool call loops, and 4-tier fallback logic.
  */
 
 try {
@@ -20,10 +20,18 @@ if (chrome.sidePanel?.setPanelBehavior) {
   });
 }
 
+// 4-Tier Fallback Chain for OpenRouter Default Mode
+const OPENROUTER_FALLBACK_CHAIN = [
+  'google/gemini-2.0-flash-exp:free',
+  'meta-llama/llama-3-8b-instruct:free',
+  'deepseek/deepseek-chat:free',
+  'openrouter/free'
+];
+
 const DEFAULT_SETTINGS = {
   activeProvider: 'openrouter',
   openrouterApiKey: '',
-  openrouterModel: 'openrouter/auto',
+  openrouterModel: 'auto_fallback',
   groqApiKey: '',
   groqModel: 'llama-3.3-70b-versatile'
 };
@@ -48,7 +56,7 @@ const PROVIDER_CONFIGS = {
     })
   },
   chrome_local: {
-    name: 'Chrome Local AI (Gemini Nano)'
+    name: 'Chrome Local AI (window.ai)'
   }
 };
 
@@ -86,23 +94,23 @@ async function getSettings() {
 }
 
 /**
- * Perform completion request with tool use loop
+ * Perform completion request with tool use loop and 4-tier fallback support
  */
-async function generateCompletion(messages, customProvider = null, targetModelOverride = null) {
+async function generateCompletion(messages, customProvider = null, targetModelOverride = null, attemptedModels = []) {
   const settings = await getSettings();
   const providerKey = customProvider || settings.activeProvider;
 
-  // Handle Chrome Local AI (Gemini Nano)
+  // Handle Chrome Local AI (window.ai)
   if (providerKey === 'chrome_local') {
     const aiApi = globalThis.ai || globalThis.window?.ai;
     if (!aiApi?.languageModel) {
-      return getGeminiNanoSetupGuide('Gemini Nano API (window.ai.languageModel) arka plan servisinde aktif değil.');
+      return getGeminiNanoSetupGuide('window.ai.languageModel API arka plan servis ortamında aktif değil.');
     }
     try {
       const session = await aiApi.languageModel.create();
       const promptText = messages.map(m => `${m.role === 'user' ? 'Kullanıcı' : m.role === 'system' ? 'Sistem' : 'Asistan'}: ${m.content}`).join('\n');
       const result = await session.prompt(promptText);
-      session.destroy?.();
+      if (typeof session.destroy === 'function') session.destroy();
       return result;
     } catch (err) {
       return getGeminiNanoSetupGuide(`Gemini Nano çalıştırılırken bir hata oluştu: ${err.message}`);
@@ -115,16 +123,26 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
   }
 
   const apiKey = providerKey === 'openrouter' ? settings.openrouterApiKey : settings.groqApiKey;
-  const model = targetModelOverride || (providerKey === 'openrouter' ? settings.openrouterModel : settings.groqModel);
-
   if (!apiKey || !apiKey.trim()) {
     throw new Error(`🔑 ${config.name} API Key eksik. Lütfen Eklenti Seçenekleri (Ayarlar) sayfasından ${config.name} API anahtarınızı kaydedin.`);
+  }
+
+  // Determine if we are in 4-tier auto fallback mode for OpenRouter
+  const isAutoFallbackMode = providerKey === 'openrouter' && (!settings.openrouterModel || settings.openrouterModel === 'auto_fallback');
+
+  let modelToUse = targetModelOverride;
+  if (!modelToUse) {
+    if (isAutoFallbackMode) {
+      modelToUse = OPENROUTER_FALLBACK_CHAIN[0];
+    } else {
+      modelToUse = providerKey === 'openrouter' ? settings.openrouterModel : settings.groqModel;
+    }
   }
 
   const toolsSchema = mcpClient?.getOpenAIToolsSchema ? mcpClient.getOpenAIToolsSchema() : undefined;
 
   const payload = {
-    model: model,
+    model: modelToUse,
     messages: messages,
     ...(toolsSchema ? { tools: toolsSchema } : {})
   };
@@ -137,6 +155,14 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
       body: JSON.stringify(payload)
     });
   } catch (netErr) {
+    if (isAutoFallbackMode) {
+      const nextAttempted = [...attemptedModels, modelToUse];
+      const nextModel = OPENROUTER_FALLBACK_CHAIN.find(m => !nextAttempted.includes(m));
+      if (nextModel) {
+        console.warn(`[OpenRouter Fallback] ${modelToUse} network error. Trying next model: ${nextModel}...`);
+        return generateCompletion(messages, 'openrouter', nextModel, nextAttempted);
+      }
+    }
     throw new Error(`🔌 İnternet/Ağ Bağlantı Hatası: ${config.name} sunucusuna erişilemedi. (${netErr.message})`);
   }
 
@@ -148,6 +174,16 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
       detail = errJson.error?.message || errJson.message || errorText;
     } catch (e) {}
 
+    // Silent 4-tier fallback loop for OpenRouter
+    if (isAutoFallbackMode && response.status !== 401) {
+      const nextAttempted = [...attemptedModels, modelToUse];
+      const nextModel = OPENROUTER_FALLBACK_CHAIN.find(m => !nextAttempted.includes(m));
+      if (nextModel) {
+        console.warn(`[OpenRouter Fallback] Model ${modelToUse} failed (${response.status}: ${detail}). Silently trying next: ${nextModel}...`);
+        return generateCompletion(messages, 'openrouter', nextModel, nextAttempted);
+      }
+    }
+
     if (response.status === 401) {
       throw new Error(`🔑 Yetkilendirme Başarısız (${config.name} 401): ${detail}. Lütfen OpenRouter API Anahtarınızı kontrol edin.`);
     }
@@ -155,12 +191,12 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
       throw new Error(`🚫 Erişim Engellendi (${config.name} 403): ${detail}. Lütfen bakiye ve izinlerinizi kontrol edin.`);
     }
     if (response.status === 404) {
-      throw new Error(`🔍 Model veya Endpoint Bulunamadı (${config.name} 404 - Model: "${model}"): ${detail}. Lütfen Eklenti Ayarlarından aktif bir model seçin.`);
+      throw new Error(`🔍 Model veya Endpoint Bulunamadı (${config.name} 404 - Model: "${modelToUse}"): ${detail}. Lütfen Eklenti Ayarlarından aktif bir model seçin.`);
     }
     if (response.status === 429) {
-      throw new Error(`⚠️ Kota / Hız Limiti Aşıldı (${config.name} 429 - Model: "${model}"): ${detail}. Lütfen biraz bekleyin.`);
+      throw new Error(`⚠️ Kota / Hız Limiti Aşıldı (${config.name} 429 - Model: "${modelToUse}"): ${detail}. Lütfen biraz bekleyin.`);
     }
-    throw new Error(`❌ ${config.name} API Hatası (${response.status} - Model: "${model}"): ${detail}`);
+    throw new Error(`❌ ${config.name} API Hatası (${response.status} - Model: "${modelToUse}"): ${detail}`);
   }
 
   const result = await response.json();
@@ -193,7 +229,7 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
     }
 
     // Recursively resolve tool results with second API call
-    return generateCompletion(updatedMessages, providerKey, model);
+    return generateCompletion(updatedMessages, providerKey, modelToUse, attemptedModels);
   }
 
   return choiceMessage.content || '';

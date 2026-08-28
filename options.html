@@ -166,7 +166,7 @@
           <select id="active-provider">
             <option value="openrouter">OpenRouter (Claude 3.5, GPT-4o, Gemini vb.)</option>
             <option value="groq">Groq (Llama 3.3 70B, Qwen 2.5 Coder vb.)</option>
-            <option value="chrome_local">Chrome Local AI (Gemini Nano - Cihaz İçi)</option>
+            <option value="chrome_local">Chrome Local AI (window.ai)</option>
           </select>
           <div class="help-text">Tüm sohbet ve araç kullanımı seçtiğiniz sağlayıcı üzerinden gerçekleşir.</div>
         </div>
@@ -183,14 +183,14 @@
         <div class="form-group">
           <label for="openrouter-model">Varsayılan Model</label>
           <select id="openrouter-model">
-            <option value="openrouter/auto">Auto Router (En Uygun Aktif Modeli Otomatik Seçer)</option>
-            <option value="deepseek/deepseek-chat">DeepSeek V3 (Çok Hızlı ve Akıllı)</option>
-            <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B Instruct</option>
+            <option value="auto_fallback">4 Kademeli Otomatik Fallback (Gemini Flash ➔ Llama 3 ➔ DeepSeek ➔ OpenRouter Free)</option>
+            <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash Exp (Ücretsiz)</option>
+            <option value="meta-llama/llama-3-8b-instruct:free">Llama 3 8B Instruct (Ücretsiz)</option>
+            <option value="deepseek/deepseek-chat:free">DeepSeek Chat (Ücretsiz)</option>
+            <option value="openrouter/free">OpenRouter Free Router</option>
             <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
             <option value="openai/gpt-4o">GPT-4o</option>
             <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-            <option value="deepseek/deepseek-r1">DeepSeek R1</option>
-            <option value="qwen/qwen-2.5-coder-32b-instruct">Qwen 2.5 Coder 32B</option>
           </select>
         </div>
       </div>
