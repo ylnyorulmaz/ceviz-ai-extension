@@ -1,7 +1,7 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * 100% Self-Contained Service Worker with Smart Auto Key Decryption
+ * 100% Self-Contained Service Worker with Scripting Timeout Protection
  */
 
 // --- CryptoVault Module (Inlined for 100% Decryption Reliability) ---
@@ -85,17 +85,23 @@ class MCPClient {
         if (!tab?.id) return { error: 'Aktif sekme bulunamadı.' };
 
         try {
-          const results = await chrome.scripting.executeScript({
+          const scriptPromise = chrome.scripting.executeScript({
             target: { tabId: tab.id },
             func: () => {
               const mainElem = document.querySelector('article, main, #content, .content, .post-content') || document.body;
               return mainElem?.innerText || document.body?.innerText || '';
             }
           });
+
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Sayfa okuma zaman aşımı (3s).')), 3000)
+          );
+
+          const results = await Promise.race([scriptPromise, timeoutPromise]);
           const text = results[0]?.result || '';
           return { title: tab.title, url: tab.url, content: text.slice(0, maxLen), truncated: text.length > maxLen };
         } catch (err) {
-          return { error: `Sayfa içeriği okunamadı: ${err.message}` };
+          return { title: tab?.title || '', url: tab?.url || '', content: `(Sayfa metni kısmen korumalı: ${err.message})` };
         }
       }
     });
@@ -307,7 +313,7 @@ async function executeSupabaseRequest(messages, settings) {
     let detail = errText;
     try {
       const errJson = JSON.parse(errText);
-      detail = errJson.error?.message || errJson.message || errText;
+      detail = errJson.error?.message || errJson.message || errorText;
     } catch (e) {}
     throw new Error(`Supabase Edge Function Hatası (${response.status}): ${detail}`);
   }

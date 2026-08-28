@@ -5,6 +5,7 @@
   "description": "Akıllı Web Asistanı",
   "permissions": [
     "activeTab",
+    "scripting",
     "storage",
     "sidePanel"
   ],
