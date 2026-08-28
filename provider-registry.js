@@ -21,6 +21,7 @@
   }
 
   const PROVIDERS = {
+    /*
     anthropic: {
       id: 'anthropic',
       label: 'Anthropic',
@@ -98,6 +99,7 @@
         createModel('gemini-2.0-flash-lite', 'Gemini 2.0 Flash-Lite', { supportsVision: true })
       ]
     },
+    */
     groq: {
       id: 'groq',
       label: 'Groq',
@@ -107,15 +109,17 @@
       requiresApiKey: true,
       defaultBaseUrl: 'https://api.groq.com/openai/v1',
       defaultModel: 'llama-3.3-70b-versatile',
+      publicModelsUrl: 'https://api.groq.com/openai/v1/models',
       models: [
-        createModel('openai/gpt-oss-120b', 'GPT-OSS 120B', { supportsVision: false }),
-        createModel('openai/gpt-oss-20b', 'GPT-OSS 20B', { supportsVision: false }),
         createModel('llama-3.3-70b-versatile', 'Llama 3.3 70B Versatile', { supportsVision: false }),
         createModel('llama-3.1-8b-instant', 'Llama 3.1 8B Instant', { supportsVision: false }),
-        createModel('qwen/qwen3-32b', 'Qwen 3 32B', { supportsVision: false }),
-        createModel('deepseek-r1-distill-qwen-32b', 'DeepSeek R1 Distill Qwen 32B', { supportsVision: false })
+        createModel('llama-3.2-11b-vision-preview', 'Llama 3.2 11B Vision', { supportsVision: true }),
+        createModel('llama-3.2-90b-vision-preview', 'Llama 3.2 90B Vision', { supportsVision: true }),
+        createModel('qwen-2.5-coder-32b', 'Qwen 2.5 Coder 32B', { supportsVision: false }),
+        createModel('deepseek-r1-distill-llama-70b', 'DeepSeek R1 Distill Llama 70B', { supportsVision: false })
       ]
     },
+    /*
     mistral: {
       id: 'mistral',
       label: 'Mistral',
@@ -210,6 +214,7 @@
         createModel('qwen-3-235b-a22b-instruct-2507', 'Qwen 3 235B A22B', { supportsVision: false })
       ]
     },
+    */
     openrouter: {
       id: 'openrouter',
       label: 'OpenRouter',
@@ -224,17 +229,13 @@
         createModel('openai/gpt-4o-mini', 'GPT-4o Mini', { supportsVision: true }),
         createModel('anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet', { supportsVision: true }),
         createModel('google/gemini-2.0-flash-001', 'Gemini 2.0 Flash', { supportsVision: true }),
-        createModel('openai/gpt-5', 'GPT-5', { supportsVision: true }),
-        createModel('openai/gpt-5-mini', 'GPT-5 Mini', { supportsVision: true }),
-        createModel('openai/o3', 'o3', { supportsVision: true }),
-        createModel('openai/o4-mini', 'o4-mini', { supportsVision: true }),
-        createModel('anthropic/claude-opus-4.1', 'Claude Opus 4.1', { supportsVision: true }),
-        createModel('anthropic/claude-sonnet-4.5', 'Claude Sonnet 4.5', { supportsVision: true }),
-        createModel('google/gemini-2.5-pro', 'Gemini 2.5 Pro', { supportsVision: true }),
-        createModel('google/gemini-2.5-flash', 'Gemini 2.5 Flash', { supportsVision: true }),
-        createModel('x-ai/grok-4.20-beta', 'Grok 4.20 Beta', { supportsVision: true })
+        createModel('openai/gpt-4o', 'GPT-4o', { supportsVision: true }),
+        createModel('meta-llama/llama-3.3-70b-instruct', 'Llama 3.3 70B', { supportsVision: false }),
+        createModel('deepseek/deepseek-r1', 'DeepSeek R1', { supportsVision: false }),
+        createModel('deepseek/deepseek-chat', 'DeepSeek V3', { supportsVision: false })
       ]
-    },
+    }
+    /*
     deepseek: {
       id: 'deepseek',
       label: 'DeepSeek',
@@ -360,6 +361,7 @@
       ],
       note: 'Use this for Amazon Bedrock or other providers behind a LiteLLM-compatible gateway.'
     }
+    */
   };
 
   function deepClone(value) {
@@ -406,7 +408,7 @@
     const providers = {};
     Object.values(PROVIDERS).forEach((provider) => {
       providers[provider.id] = {
-        enabled: provider.id === 'zaiCoding',
+        enabled: true,
         apiKey: '',
         baseUrl: provider.defaultBaseUrl,
         model: provider.defaultModel,
@@ -417,7 +419,7 @@
 
     return {
       version: 2,
-      activeProvider: 'zaiCoding',
+      activeProvider: 'openrouter',
       providers
     };
   }
@@ -477,47 +479,14 @@
     });
 
     if (!normalized.providers[normalized.activeProvider]) {
-      normalized.activeProvider = 'zaiCoding';
+      normalized.activeProvider = 'openrouter';
     }
-
-    migrateZaiProviders(normalized);
 
     return normalized;
   }
 
-  function migrateZaiProviders(state) {
-    const zai = state.providers.zai;
-    const zaiCoding = state.providers.zaiCoding;
-    if (!zai || !zaiCoding) {
-      return;
-    }
-
-    const zaiBase = String(zai.baseUrl || '');
-    const codingBase = String(zaiCoding.baseUrl || '');
-    const zaiLooksLikeCoding = /\/coding\//.test(zaiBase);
-    const codingLooksNormal = codingBase && !/\/coding\//.test(codingBase);
-
-    if (zaiLooksLikeCoding) {
-      zai.baseUrl = PROVIDERS.zai.defaultBaseUrl;
-      zaiCoding.baseUrl = PROVIDERS.zaiCoding.defaultBaseUrl;
-
-      if (zai.apiKey && !zaiCoding.apiKey) {
-        zaiCoding.apiKey = zai.apiKey;
-      }
-
-      if (zai.model && (!zaiCoding.model || zaiCoding.model === PROVIDERS.zaiCoding.defaultModel)) {
-        zaiCoding.model = zai.model;
-      }
-
-      state.activeProvider = 'zaiCoding';
-    } else if (codingLooksNormal && /\/coding\//.test(zaiBase) === false && zaiCoding.baseUrl === PROVIDERS.zai.defaultBaseUrl) {
-      zaiCoding.baseUrl = PROVIDERS.zaiCoding.defaultBaseUrl;
-      state.activeProvider = 'zaiCoding';
-    }
-  }
-
   function getProviderDefinition(providerId) {
-    return PROVIDERS[providerId] || PROVIDERS.zaiCoding;
+    return PROVIDERS[providerId] || PROVIDERS.openrouter || PROVIDERS.groq;
   }
 
   function isConfiguredProvider(providerId, providerState) {
@@ -534,7 +503,7 @@
   }
 
   function getActiveProviderState(state) {
-    return state.providers[state.activeProvider] || state.providers.zaiCoding;
+    return state.providers[state.activeProvider] || state.providers.openrouter || state.providers.groq;
   }
 
   function getActiveProviderDefinition(state) {

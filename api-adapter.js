@@ -15,11 +15,16 @@
   const SKIP_PERMS_PROMPT = SYSTEM_PROMPT + '\n\nYou have been granted permission to act without asking for confirmation on each action. Proceed efficiently with the task.';
 
   const DEFAULT_PROVIDER_CONFIG = {
-    provider: 'zai',
-    zai: {
-      baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+    provider: 'openrouter',
+    openrouter: {
+      baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: '',
-      model: 'glm-4.6v'
+      model: 'openai/gpt-4o-mini'
+    },
+    groq: {
+      baseUrl: 'https://api.groq.com/openai/v1',
+      apiKey: '',
+      model: 'llama-3.3-70b-versatile'
     }
   };
 
@@ -177,9 +182,13 @@
       return {
         ...DEFAULT_PROVIDER_CONFIG,
         ...config,
-        zai: {
-          ...DEFAULT_PROVIDER_CONFIG.zai,
-          ...(config.zai || {})
+        openrouter: {
+          ...DEFAULT_PROVIDER_CONFIG.openrouter,
+          ...(config.openrouter || {})
+        },
+        groq: {
+          ...DEFAULT_PROVIDER_CONFIG.groq,
+          ...(config.groq || {})
         }
       };
     } catch (error) {
@@ -203,8 +212,8 @@
       };
     }
 
-    const providerName = config.provider || 'zai';
-    return config[providerName] || config.zai || DEFAULT_PROVIDER_CONFIG.zai;
+    const providerName = config.provider || 'openrouter';
+    return config[providerName] || config.openrouter || config.groq || DEFAULT_PROVIDER_CONFIG.openrouter;
   }
 
   function ensureArray(value) {
@@ -1081,7 +1090,7 @@
     }
 
     // Google Gemini OpenAI-compat endpoint uses ?key= param; remove Bearer header to avoid conflicts
-    let rawUpstreamUrl = `${String(provider.baseUrl || DEFAULT_PROVIDER_CONFIG.zai.baseUrl).replace(/\/+$/, '')}/chat/completions`;
+    let rawUpstreamUrl = `${String(provider.baseUrl || DEFAULT_PROVIDER_CONFIG.openrouter.baseUrl).replace(/\/+$/, '')}/chat/completions`;
     if (provider.id === 'google' && provider.apiKey) {
       rawUpstreamUrl = `${rawUpstreamUrl}?key=${encodeURIComponent(provider.apiKey)}`;
       headers.delete('Authorization');
