@@ -1307,6 +1307,10 @@
         return proxyAnthropicMessages(input, init);
       }
 
+      if (url.includes('/domain_info') || url.includes('/web/domain_info')) {
+        return jsonResponse({ category: 'category0', org_policy: 'allow' });
+      }
+
       if (url.includes('/api/oauth/profile') || url.includes('/oauth/profile')) {
         return jsonResponse(MOCK_PROFILE);
       }
