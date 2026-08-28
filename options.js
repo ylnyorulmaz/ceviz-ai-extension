@@ -1,10 +1,9 @@
 /**
- * Ceviz.ai - Options UI Controller (API Keys & Mode Selection Only)
+ * Ceviz.ai - Options UI Controller (Clean API Keys & Mode Selection)
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
   const usageModeInput = document.getElementById('usage-mode');
-  const byokProviderInput = document.getElementById('byok-provider');
   const openrouterKeyInput = document.getElementById('openrouter-key');
   const groqKeyInput = document.getElementById('groq-key');
   const gumroadKeyInput = document.getElementById('gumroad-key');
@@ -42,7 +41,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (response?.success && response.settings) {
     const s = response.settings;
     if (s.usageMode) usageModeInput.value = s.usageMode;
-    if (s.byokProvider) byokProviderInput.value = s.byokProvider;
 
     if (s.openrouterApiKey) openrouterKeyInput.value = cleanKey(s.openrouterApiKey);
     if (s.groqApiKey) groqKeyInput.value = cleanKey(s.groqApiKey);
@@ -59,8 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const newSettings = {
       usageMode: usageModeInput.value,
-      byokProvider: byokProviderInput.value,
-      activeProvider: usageModeInput.value === 'byok' ? byokProviderInput.value : usageModeInput.value,
+      activeProvider: usageModeInput.value,
       openrouterApiKey: rawOpenRouter,
       openrouterModel: 'auto_fallback',
       groqApiKey: rawGroq,
