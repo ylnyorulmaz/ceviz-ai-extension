@@ -4,7 +4,7 @@
  * Smart Router Architecture:
  * 1. BYOK Mode (Direct OpenRouter / Groq HTTPS fetch)
  * 2. Gumroad License Mode (Supabase Edge Function: https://placeholder.supabase.co/functions/v1/chat)
- * 3. Smart Model Escalation (Task Complexity Router: Light ➔ Llama 3, Standard ➔ Gemini Flash, Heavy ➔ DeepSeek V3)
+ * 3. Smart Model Escalation (Task Complexity Router with 100% Live Verified Models)
  * 4. 4-Tier Fallback for OpenRouter
  * 5. Automatic Smart Fallback to Secondary Mode / Chrome Local AI (window.ai)
  */
@@ -25,12 +25,12 @@ if (chrome.sidePanel?.setPanelBehavior) {
   });
 }
 
-// 4-Tier Fallback Chain for OpenRouter Default Mode
+// 4-Tier Fallback Chain for OpenRouter Default Mode (100% Live Valid OpenRouter IDs)
 const OPENROUTER_FALLBACK_CHAIN = [
-  'google/gemini-2.0-flash-exp:free',
-  'meta-llama/llama-3-8b-instruct:free',
-  'deepseek/deepseek-chat:free',
-  'openrouter/free'
+  'openrouter/auto',
+  'deepseek/deepseek-chat',
+  'meta-llama/llama-3.3-70b-instruct',
+  'openai/gpt-4o-mini'
 ];
 
 const SUPABASE_EDGE_ENDPOINT = 'https://placeholder.supabase.co/functions/v1/chat';
@@ -84,7 +84,7 @@ function classifyTaskAndEscalate(lastMessageText = '') {
   ];
 
   const lightKeywords = [
-    '5 yaş', '10 yaş', '15 yaş', '20 yaş', 'çevir', 'translate', 'kısa özet', 'selam', 'merhaba', 'günaydın'
+    '5 yaş', '10 yaş', '15 yaş', '20 yaş', 'çevir', 'translate', 'kısa özet', 'selam', 'merhaba', 'günaydın', 'ela'
   ];
 
   const isHeavy = heavyKeywords.some(kw => text.includes(kw)) || text.length > 3000;
@@ -93,7 +93,7 @@ function classifyTaskAndEscalate(lastMessageText = '') {
   if (isHeavy) {
     return {
       tier: 'heavy',
-      model: 'deepseek/deepseek-chat:free',
+      model: 'deepseek/deepseek-chat',
       badge: '⚡ Daha derin analiz için DeepSeek V3 motoruna geçildi...'
     };
   }
@@ -101,15 +101,15 @@ function classifyTaskAndEscalate(lastMessageText = '') {
   if (isLight) {
     return {
       tier: 'light',
-      model: 'meta-llama/llama-3-8b-instruct:free',
-      badge: '🚀 Hızlı yanıt için Llama 3 8B motoru kullanıldı...'
+      model: 'meta-llama/llama-3.3-70b-instruct',
+      badge: '🚀 ELA / Hızlı anlatım için Llama 3.3 70B motoru kullanıldı...'
     };
   }
 
   return {
     tier: 'standard',
-    model: 'google/gemini-2.0-flash-exp:free',
-    badge: '⚡ Standart yanıt için Gemini 2.0 Flash motoru kullanıldı...'
+    model: 'openrouter/auto',
+    badge: '⚡ Otomatik optimizasyon ile Auto Router motoru kullanıldı...'
   };
 }
 

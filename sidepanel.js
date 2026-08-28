@@ -142,7 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
       chipBtn.type = 'button';
       chipBtn.className = 'ela-chip';
       chipBtn.textContent = item.label;
-      chipBtn.addEventListener('click', () => {
+      chipBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const elaPrompt = `Bu konuyu ${item.age} yaşındaki birinin anlayacağı basit kelimeler, somut kavramlar ve eğlenceli benzetmelerle yeniden açıkla.`;
         sendMessage(elaPrompt);
       });
