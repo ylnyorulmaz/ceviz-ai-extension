@@ -1,8 +1,8 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * Handles background operations, OpenRouter & Groq API requests,
- * sidePanel behavior, and MCP Client tool call loops.
+ * Handles background operations, OpenRouter, Groq, and Chrome Local AI (Gemini Nano)
+ * requests, sidePanel behavior, and MCP Client tool call loops.
  */
 
 import { MCPClient } from './mcp-client.js';
@@ -43,8 +43,36 @@ const PROVIDER_CONFIGS = {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     })
+  },
+  chrome_local: {
+    name: 'Chrome Local AI (Gemini Nano)'
   }
 };
+
+function getGeminiNanoSetupGuide(reason = '') {
+  return `💡 **Chrome Local AI (Gemini Nano) Aktif Değil**
+
+${reason ? `*Durum: ${reason}*\n\n` : ''}Gemini Nano'yu tarayıcınızda sıfır gecikmeli ve tamamen internetsiz (cihaz içi) kullanmak için lütfen aşağıdaki adımları uygulayın:
+
+---
+
+### 1️⃣ Chrome Bayraklarını (Flags) Açın:
+1. Adres çubuğuna **\`chrome://flags\`** yazın ve gidin.
+2. **\`#optimization-guide-on-device-model\`** bayrağını bulun ➔ **\`Enabled Bypassperfrequirement\`** seçin.
+3. **\`#prompt-api-for-gemini-nano\`** bayrağını bulun ➔ **\`Enabled\`** seçin.
+4. Sayfanın altındaki **Relaunch (Yeniden Başlat)** butonuna tıklayarak Chrome'u yeniden başlatın.
+
+---
+
+### 2️⃣ Modeli İndirin ve Kontrol Edin:
+1. Adres çubuğuna **\`chrome://on-device-internals\`** yazın.
+2. **Model Status** bölümünde **\`Optimization Guide On Device Model\`** indiriliyor veya yüklendi olarak görünmelidir.
+3. Alternatif olarak **\`chrome://components\`** sayfasına gidip **\`Optimization Guide On Device Model\`** yanında **Check for update (Güncellemeleri kontrol et)** butonuna tıklayın.
+
+---
+
+İndirme tamamlandıktan sonra Ceviz.ai Yan Paneli üzerinden doğrudan cihaz içi yapay zeka ile konuşabilirsiniz! 🚀`;
+}
 
 /**
  * Get current settings from chrome.storage.local
@@ -60,8 +88,25 @@ async function getSettings() {
 async function generateCompletion(messages, customProvider = null, targetModelOverride = null) {
   const settings = await getSettings();
   const providerKey = customProvider || settings.activeProvider;
-  const config = PROVIDER_CONFIGS[providerKey];
 
+  // Handle Chrome Local AI (Gemini Nano)
+  if (providerKey === 'chrome_local') {
+    const aiApi = globalThis.ai || globalThis.window?.ai;
+    if (!aiApi?.languageModel) {
+      return getGeminiNanoSetupGuide('Gemini Nano API (window.ai.languageModel) arka plan servisinde aktif değil.');
+    }
+    try {
+      const session = await aiApi.languageModel.create();
+      const promptText = messages.map(m => `${m.role === 'user' ? 'Kullanıcı' : m.role === 'system' ? 'Sistem' : 'Asistan'}: ${m.content}`).join('\n');
+      const result = await session.prompt(promptText);
+      session.destroy?.();
+      return result;
+    } catch (err) {
+      return getGeminiNanoSetupGuide(`Gemini Nano çalıştırılırken bir hata oluştu: ${err.message}`);
+    }
+  }
+
+  const config = PROVIDER_CONFIGS[providerKey];
   if (!config) {
     throw new Error(`Bilinmeyen sağlayıcı: ${providerKey}`);
   }
