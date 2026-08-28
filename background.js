@@ -4,8 +4,9 @@
  * Smart Router Architecture:
  * 1. BYOK Mode (Direct OpenRouter / Groq HTTPS fetch)
  * 2. Gumroad License Mode (Supabase Edge Function: https://placeholder.supabase.co/functions/v1/chat)
- * 3. 4-Tier Fallback for OpenRouter
- * 4. Automatic Smart Fallback to Secondary Mode / Chrome Local AI (window.ai)
+ * 3. Smart Model Escalation (Task Complexity Router: Light ➔ Llama 3, Standard ➔ Gemini Flash, Heavy ➔ DeepSeek V3)
+ * 4. 4-Tier Fallback for OpenRouter
+ * 5. Automatic Smart Fallback to Secondary Mode / Chrome Local AI (window.ai)
  */
 
 try {
@@ -68,6 +69,48 @@ ${reason ? `*Durum: ${reason}*\n\n` : ''}Gemini Nano'yu tarayıcınızda sıfır
 ---
 
 İndirme tamamlandıktan sonra Ceviz.ai Yan Paneli üzerinden doğrudan cihaz içi yapay zeka ile konuşabilirsiniz! 🚀`;
+}
+
+/**
+ * Classifies prompt complexity and selects escalated model with notification badge
+ */
+function classifyTaskAndEscalate(lastMessageText = '') {
+  const text = (lastMessageText || '').toLowerCase();
+
+  const heavyKeywords = [
+    'kıyasla', 'karşılaştır', 'analiz et', 'analiz', 'kod yaz', 'kodla',
+    'felsefi', 'detaylı incele', 'derinlemesine', 'compare', 'analyze',
+    'refactor', 'architect', 'algorithm', 'algoritma'
+  ];
+
+  const lightKeywords = [
+    '5 yaş', '10 yaş', '15 yaş', '20 yaş', 'çevir', 'translate', 'kısa özet', 'selam', 'merhaba', 'günaydın'
+  ];
+
+  const isHeavy = heavyKeywords.some(kw => text.includes(kw)) || text.length > 3000;
+  const isLight = lightKeywords.some(kw => text.includes(kw));
+
+  if (isHeavy) {
+    return {
+      tier: 'heavy',
+      model: 'deepseek/deepseek-chat:free',
+      badge: '⚡ Daha derin analiz için DeepSeek V3 motoruna geçildi...'
+    };
+  }
+
+  if (isLight) {
+    return {
+      tier: 'light',
+      model: 'meta-llama/llama-3-8b-instruct:free',
+      badge: '🚀 Hızlı yanıt için Llama 3 8B motoru kullanıldı...'
+    };
+  }
+
+  return {
+    tier: 'standard',
+    model: 'google/gemini-2.0-flash-exp:free',
+    badge: '⚡ Standart yanıt için Gemini 2.0 Flash motoru kullanıldı...'
+  };
 }
 
 /**
@@ -137,15 +180,15 @@ async function executeSupabaseRequest(messages, settings) {
   }
 
   const data = await response.json();
-  return data.reply || data.choices?.[0]?.message?.content || data.content || '';
+  const reply = data.reply || data.choices?.[0]?.message?.content || data.content || '';
+  return { reply, badge: '🔑 Ceviz Pro Lisansı ile Supabase Edge üzerinden yanıtlandı.' };
 }
 
 /**
- * Execute BYOK Request directly to OpenRouter or Groq with 4-tier fallback
+ * Execute BYOK Request directly to OpenRouter or Groq with 4-tier fallback and Smart Escalation
  */
 async function executeBYOKRequest(messages, settings, targetModelOverride = null, attemptedModels = []) {
   const providerKey = settings.byokProvider || settings.activeProvider || 'openrouter';
-
   const isGroq = providerKey === 'groq';
   const baseUrl = isGroq
     ? 'https://api.groq.com/openai/v1/chat/completions'
@@ -163,14 +206,21 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
     throw new Error(`🔑 BYOK API Key eksik (${isGroq ? 'Groq' : 'OpenRouter'}). Lütfen API anahtarınızı Eklenti Ayarlarından girin.`);
   }
 
+  const lastMsgText = messages.length > 0 ? messages[messages.length - 1].content : '';
+  const escalation = classifyTaskAndEscalate(lastMsgText);
+
   const isAutoFallbackMode = !isGroq && (!settings.openrouterModel || settings.openrouterModel === 'auto_fallback');
 
   let modelToUse = targetModelOverride;
+  let badgeToUse = '';
+
   if (!modelToUse) {
     if (isAutoFallbackMode) {
-      modelToUse = OPENROUTER_FALLBACK_CHAIN[0];
+      modelToUse = escalation.model;
+      badgeToUse = escalation.badge;
     } else {
       modelToUse = isGroq ? settings.groqModel : settings.openrouterModel;
+      badgeToUse = `⚙️ Özel Model (${modelToUse}) kullanıldı.`;
     }
   }
 
@@ -276,11 +326,14 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
     return executeBYOKRequest(messages, settings, modelToUse, attemptedModels);
   }
 
-  return choiceMessage.content || '';
+  return {
+    reply: choiceMessage.content || '',
+    badge: badgeToUse
+  };
 }
 
 /**
- * Smart Router with Priority Mode Execution & Automatic Secondary / Local AI Fallback
+ * Smart Router with Priority Mode Execution, Task Escalation & Automatic Secondary / Local AI Fallback
  */
 async function smartRouteCompletion(messages) {
   const settings = await getSettings();
@@ -309,7 +362,8 @@ async function smartRouteCompletion(messages) {
     } else if (usageMode === 'gumroad' && hasGumroad) {
       return await executeSupabaseRequest(messages, settings);
     } else if (usageMode === 'chrome_local') {
-      return await executeChromeLocalAI(messages);
+      const reply = await executeChromeLocalAI(messages);
+      return { reply, badge: '💻 Chrome Local AI (Gemini Nano - Cihaz İçi) kullanıldı.' };
     }
   } catch (primaryErr) {
     console.warn(`[Smart Router] Primary mode (${usageMode}) failed:`, primaryErr.message);
@@ -349,7 +403,10 @@ async function smartRouteCompletion(messages) {
   // 3. Last Resort Fallback: Chrome Local AI (window.ai)
   try {
     const localReply = await executeChromeLocalAI(messages);
-    return `${localReply}\n\n💡 *Not: API limitleriniz dolduğu veya sunucuya erişilemediği için yanıt cihaz içi AI (Chrome Local AI) tarafından üretilmiştir.*`;
+    return {
+      reply: localReply,
+      badge: '💡 API limitleriniz dolduğu veya sunucuya erişilemediği için yanıt cihaz içi AI (Chrome Local AI) tarafından üretilmiştir.'
+    };
   } catch (localErr) {
     throw new Error('❌ Tüm bağlantı yöntemleri ve yerel AI başarısız oldu. Lütfen API anahtarlarınızı veya lisansınızı kontrol edin.');
   }
@@ -359,7 +416,7 @@ async function smartRouteCompletion(messages) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'GENERATE_COMPLETION') {
     smartRouteCompletion(request.messages)
-      .then((reply) => sendResponse({ success: true, reply }))
+      .then((res) => sendResponse({ success: true, reply: res.reply, badge: res.badge }))
       .catch((error) => sendResponse({ success: false, error: error.message }));
     return true;
   }

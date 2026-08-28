@@ -1,5 +1,5 @@
 /**
- * Ceviz.ai - Side Panel UI Controller
+ * Ceviz.ai - Side Panel UI Controller with ELA Chips and Model Escalation Badges
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -26,98 +26,137 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  sendBtn.addEventListener('click', sendMessage);
+  sendBtn.addEventListener('click', () => sendMessage());
 
-  function getGeminiNanoSetupGuide(reason = '') {
-    return `💡 Chrome Local AI (Gemini Nano) Aktif Değil
-
-${reason ? `Durum: ${reason}\n\n` : ''}Gemini Nano'yu tarayıcınızda sıfır gecikmeli ve tamamen internetsiz (cihaz içi) kullanmak için lütfen aşağıdaki adımları uygulayın:
-
----
-1️⃣ Chrome Bayraklarını (Flags) Açın:
-1. Adres çubuğuna chrome://flags yazın ve gidin.
-2. #optimization-guide-on-device-model bayrağını bulun -> Enabled Bypassperfrequirement seçin.
-3. #prompt-api-for-gemini-nano bayrağını bulun -> Enabled seçin.
-4. Sayfanın altındaki Relaunch (Yeniden Başlat) butonuna tıklayarak Chrome'u yeniden başlatın.
-
----
-2️⃣ Modeli İndirin ve Kontrol Edin:
-1. Adres çubuğuna chrome://on-device-internals yazın.
-2. Model Status bölümünde Optimization Guide On Device Model indiriliyor veya yüklendi olarak görünmelidir.
-3. Alternatif olarak chrome://components sayfasına gidip Optimization Guide On Device Model yanında Check for update butonuna tıklayın.
-
-İndirme tamamlandıktan sonra doğrudan cihaz içi yapay zeka ile konuşabilirsiniz! 🚀`;
-  }
-
-  async function handleChromeLocalAI(messages) {
-    const aiApi = window.ai || globalThis.ai;
-    if (!aiApi?.languageModel) {
-      return getGeminiNanoSetupGuide('window.ai.languageModel API tarayıcınızda aktif edilmemiş.');
-    }
-
-    try {
-      const session = await aiApi.languageModel.create();
-      const promptText = messages.map(m => `${m.role === 'user' ? 'Kullanıcı' : m.role === 'system' ? 'Sistem' : 'Asistan'}: ${m.content}`).join('\n');
-      const result = await session.prompt(promptText);
-      if (typeof session.destroy === 'function') {
-        session.destroy();
-      }
-      return result;
-    } catch (err) {
-      return getGeminiNanoSetupGuide(`Gemini Nano çalıştırılırken hata: ${err.message}`);
-    }
-  }
-
-  async function sendMessage() {
-    const text = userInput.value.trim();
+  /**
+   * Main function to send message to background Smart Router
+   */
+  async function sendMessage(overrideText = null) {
+    const text = (overrideText || userInput.value).trim();
     if (!text) return;
 
-    appendMessage('user', text);
+    appendUserMessage(text);
     history.push({ role: 'user', content: text });
-    userInput.value = '';
+    if (!overrideText) userInput.value = '';
     sendBtn.disabled = true;
 
-    const loadingElem = appendMessage('system', 'Ceviz.ai yanıtlıyor...');
+    const loadingElem = appendSystemMessage('Ceviz.ai yanıtlıyor...');
 
     try {
-      const settingsResp = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
-      const activeProvider = settingsResp?.settings?.activeProvider || 'openrouter';
-
-      let replyText = '';
-
-      if (activeProvider === 'chrome_local') {
-        replyText = await handleChromeLocalAI(history);
-      } else {
-        const response = await chrome.runtime.sendMessage({
-          type: 'GENERATE_COMPLETION',
-          messages: history
-        });
-
-        if (response?.success) {
-          replyText = response.reply;
-        } else {
-          replyText = response?.error || 'Bir hata oluştu.';
-        }
-      }
+      const response = await chrome.runtime.sendMessage({
+        type: 'GENERATE_COMPLETION',
+        messages: history
+      });
 
       loadingElem.remove();
-      appendMessage('assistant', replyText);
-      history.push({ role: 'assistant', content: replyText });
+
+      if (response?.success) {
+        const replyText = response.reply || '';
+        const badgeText = response.badge || '';
+
+        appendAssistantMessage(replyText, badgeText);
+        history.push({ role: 'assistant', content: replyText });
+      } else {
+        const errText = response?.error || 'Bir hata oluştu.';
+        appendSystemMessage(`❌ Hata: ${errText}`);
+      }
     } catch (err) {
       loadingElem.remove();
-      appendMessage('system', `Hata: ${err.message}`);
+      appendSystemMessage(`❌ Hata: ${err.message}`);
     } finally {
       sendBtn.disabled = false;
       userInput.focus();
     }
   }
 
-  function appendMessage(role, text) {
+  /**
+   * Renders User Message
+   */
+  function appendUserMessage(text) {
+    const group = document.createElement('div');
+    group.className = 'message-group user';
+
     const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${role}`;
+    msgDiv.className = 'message user';
+    msgDiv.textContent = text;
+
+    group.appendChild(msgDiv);
+    chatBox.appendChild(group);
+    scrollToBottom();
+  }
+
+  /**
+   * Renders System Message
+   */
+  function appendSystemMessage(text) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message system';
     msgDiv.textContent = text;
     chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    scrollToBottom();
     return msgDiv;
+  }
+
+  /**
+   * Renders Assistant Message with Model Badge and ELA (Explain Like Age) Chips
+   */
+  function appendAssistantMessage(text, badgeText = '') {
+    const group = document.createElement('div');
+    group.className = 'message-group assistant';
+
+    // Model Escalation Badge
+    if (badgeText) {
+      const badgeDiv = document.createElement('div');
+      badgeDiv.className = 'model-badge';
+      badgeDiv.textContent = badgeText;
+      group.appendChild(badgeDiv);
+    }
+
+    // Message Body
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message assistant';
+    msgDiv.textContent = text;
+    group.appendChild(msgDiv);
+
+    // ELA (Explain Like Age) Chips
+    const elaContainer = document.createElement('div');
+    elaContainer.className = 'ela-container';
+
+    const elaTitle = document.createElement('div');
+    elaTitle.className = 'ela-title';
+    elaTitle.textContent = '👶 ELA (Farklı Yaş Seviyesine Göre Açıkla):';
+    elaContainer.appendChild(elaTitle);
+
+    const chipsDiv = document.createElement('div');
+    chipsDiv.className = 'ela-chips';
+
+    const ageLevels = [
+      { label: '👶 5 Yaş', age: '5' },
+      { label: '👦 10 Yaş', age: '10' },
+      { label: '🧑 15 Yaş', age: '15' },
+      { label: '👨 20 Yaş', age: '20' }
+    ];
+
+    ageLevels.forEach(item => {
+      const chipBtn = document.createElement('button');
+      chipBtn.type = 'button';
+      chipBtn.className = 'ela-chip';
+      chipBtn.textContent = item.label;
+      chipBtn.addEventListener('click', () => {
+        const elaPrompt = `Bu konuyu ${item.age} yaşındaki birinin anlayacağı basit kelimeler, somut kavramlar ve eğlenceli benzetmelerle yeniden açıkla.`;
+        sendMessage(elaPrompt);
+      });
+      chipsDiv.appendChild(chipBtn);
+    });
+
+    elaContainer.appendChild(chipsDiv);
+    group.appendChild(elaContainer);
+
+    chatBox.appendChild(group);
+    scrollToBottom();
+  }
+
+  function scrollToBottom() {
+    chatBox.scrollTop = chatBox.scrollHeight;
   }
 });

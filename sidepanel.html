@@ -70,27 +70,42 @@
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
+    }
+
+    .message-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-width: 90%;
+    }
+
+    .message-group.user {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+
+    .message-group.assistant {
+      align-self: flex-start;
+      align-items: flex-start;
     }
 
     .message {
-      max-width: 85%;
       padding: 12px 16px;
       border-radius: 12px;
       font-size: 0.92rem;
       line-height: 1.5;
       word-break: break-word;
+      white-space: pre-wrap;
     }
 
     .message.user {
-      align-self: flex-end;
       background: var(--user-msg-bg);
       color: #fff;
       border-bottom-right-radius: 2px;
     }
 
     .message.assistant {
-      align-self: flex-start;
       background: var(--ai-msg-bg);
       color: var(--text);
       border-bottom-left-radius: 2px;
@@ -103,6 +118,60 @@
       font-size: 0.82rem;
       text-align: center;
       border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    /* Model Info Badge */
+    .model-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      margin-bottom: 2px;
+    }
+
+    /* ELA (Explain Like Age) Chips */
+    .ela-container {
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ela-title {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .ela-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .ela-chip {
+      background: rgba(56, 189, 248, 0.08);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 14px;
+      padding: 3px 9px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .ela-chip:hover {
+      background: var(--accent);
+      color: #0f172a;
+      border-color: var(--accent);
+      transform: translateY(-1px);
     }
 
     footer {
