@@ -26,7 +26,9 @@
   ];
 
   function replaceText(root) {
-    const walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT);
+    const targetNode = (root && root.nodeType) ? root : (document.body || document.documentElement);
+    if (!targetNode) return;
+    const walker = document.createTreeWalker(targetNode, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
       if (!node.nodeValue || !node.nodeValue.trim()) {
