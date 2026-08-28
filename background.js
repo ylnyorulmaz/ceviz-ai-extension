@@ -16,11 +16,18 @@ if (chrome.sidePanel?.setPanelBehavior) {
   });
 }
 
+const OPENROUTER_FREE_FALLBACKS = [
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'z-ai/glm-5.2:free',
+  'google/gemini-2.0-flash-001'
+];
+
 const DEFAULT_SETTINGS = {
   activeProvider: 'openrouter',
   openrouterApiKey: '',
-  openrouterModel: 'meta-llama/llama-3-8b-instruct:free',
-  openrouterFallbackModel: 'google/gemini-2.0-flash-exp:free',
+  openrouterModel: 'google/gemma-4-31b-it:free',
+  openrouterFallbackModel: 'google/gemma-4-26b-a4b-it:free',
   groqApiKey: '',
   groqModel: 'llama-3.3-70b-versatile'
 };
@@ -85,7 +92,7 @@ async function getSettings() {
 /**
  * Perform completion request with tool use loop and fallback support
  */
-async function generateCompletion(messages, customProvider = null, targetModelOverride = null) {
+async function generateCompletion(messages, customProvider = null, targetModelOverride = null, attemptedModels = []) {
   const settings = await getSettings();
   const providerKey = customProvider || settings.activeProvider;
 
@@ -145,11 +152,15 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
       detail = errJson.error?.message || errJson.message || errorText;
     } catch (e) {}
 
-    // OpenRouter Automatic Fallback to google/gemini-2.0-flash-exp:free
-    const fallbackModel = settings.openrouterFallbackModel || 'google/gemini-2.0-flash-exp:free';
-    if (providerKey === 'openrouter' && model !== fallbackModel && response.status !== 401) {
-      console.warn(`[OpenRouter] Primary model (${model}) failed (${response.status}: ${detail}). Falling back to ${fallbackModel}...`);
-      return generateCompletion(messages, 'openrouter', fallbackModel);
+    // Multi-level automatic fallback for OpenRouter (404 / Model unavailable / 429)
+    if (providerKey === 'openrouter' && response.status !== 401) {
+      const currentAttempted = [...attemptedModels, model];
+      const nextFallback = OPENROUTER_FREE_FALLBACKS.find(m => !currentAttempted.includes(m));
+
+      if (nextFallback) {
+        console.warn(`[OpenRouter] Model (${model}) failed (${response.status}: ${detail}). Trying fallback: ${nextFallback}...`);
+        return generateCompletion(messages, 'openrouter', nextFallback, currentAttempted);
+      }
     }
 
     if (response.status === 401) {
@@ -194,7 +205,7 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
     }
 
     // Recursively resolve tool results with second API call
-    return generateCompletion(updatedMessages, providerKey, model);
+    return generateCompletion(updatedMessages, providerKey, model, attemptedModels);
   }
 
   return choiceMessage.content || '';
