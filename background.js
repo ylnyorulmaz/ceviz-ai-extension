@@ -6,7 +6,7 @@
  * 2. Gumroad License Mode (Supabase Edge Function: https://placeholder.supabase.co/functions/v1/chat)
  * 3. Smart Model Escalation (Task Complexity Router with 100% Live Verified Models)
  * 4. 4-Tier Fallback for OpenRouter
- * 5. Automatic Smart Fallback to Secondary Mode / Chrome Local AI (window.ai)
+ * 5. Explicit Error Reporting (No Silent Error Swallowing)
  */
 
 try {
@@ -84,7 +84,7 @@ function classifyTaskAndEscalate(lastMessageText = '') {
   ];
 
   const lightKeywords = [
-    '5 yaş', '10 yaş', '15 yaş', '20 yaş', 'çevir', 'translate', 'kısa özet', 'selam', 'merhaba', 'günaydın', 'ela'
+    '5 yaş', '6 yaş', '10 yaş', '12 yaş', '15 yaş', '18 yaş', '20 yaş', '24 yaş', 'çevir', 'translate', 'kısa özet', 'selam', 'merhaba', 'günaydın', 'ela'
   ];
 
   const isHeavy = heavyKeywords.some(kw => text.includes(kw)) || text.length > 3000;
@@ -122,12 +122,26 @@ async function getSettings() {
 }
 
 /**
+ * Safely decrypt or return key string
+ */
+async function safeDecryptKey(encryptedOrRawKey) {
+  if (!encryptedOrRawKey || typeof encryptedOrRawKey !== 'string') return '';
+  if (!globalThis.CryptoVault) return encryptedOrRawKey;
+  try {
+    const decrypted = await globalThis.CryptoVault.decrypt(encryptedOrRawKey);
+    return decrypted || encryptedOrRawKey;
+  } catch (e) {
+    return encryptedOrRawKey;
+  }
+}
+
+/**
  * Execute Chrome Local AI (window.ai)
  */
 async function executeChromeLocalAI(messages) {
   const aiApi = globalThis.ai || globalThis.window?.ai;
   if (!aiApi?.languageModel) {
-    return getGeminiNanoSetupGuide('window.ai.languageModel API ortamda aktif değil.');
+    return getGeminiNanoSetupGuide('window.ai.languageModel API tarayıcınızda aktif edilmemiş veya henüz indirilmemiş.');
   }
   try {
     const session = await aiApi.languageModel.create();
@@ -144,12 +158,7 @@ async function executeChromeLocalAI(messages) {
  * Execute Supabase Edge Function with Gumroad License Authorization header
  */
 async function executeSupabaseRequest(messages, settings) {
-  let rawLicense = '';
-  if (settings.gumroadLicenseKey && globalThis.CryptoVault) {
-    rawLicense = await globalThis.CryptoVault.decrypt(settings.gumroadLicenseKey);
-  } else {
-    rawLicense = settings.gumroadLicenseKey || '';
-  }
+  const rawLicense = await safeDecryptKey(settings.gumroadLicenseKey);
 
   if (!rawLicense || !rawLicense.trim()) {
     throw new Error('🔑 Gumroad Lisans Anahtarı eksik. Lütfen Ceviz Pro lisans kodunuzu Eklenti Ayarlarından girin.');
@@ -195,15 +204,10 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
     : 'https://openrouter.ai/api/v1/chat/completions';
 
   const encryptedKey = isGroq ? settings.groqApiKey : settings.openrouterApiKey;
-  let rawApiKey = '';
-  if (encryptedKey && globalThis.CryptoVault) {
-    rawApiKey = await globalThis.CryptoVault.decrypt(encryptedKey);
-  } else {
-    rawApiKey = encryptedKey || '';
-  }
+  const rawApiKey = await safeDecryptKey(encryptedKey);
 
   if (!rawApiKey || !rawApiKey.trim()) {
-    throw new Error(`🔑 BYOK API Key eksik (${isGroq ? 'Groq' : 'OpenRouter'}). Lütfen API anahtarınızı Eklenti Ayarlarından girin.`);
+    throw new Error(`🔑 BYOK API Key eksik (${isGroq ? 'Groq' : 'OpenRouter'}). Lütfen Eklenti Ayarlarından (${configName(isGroq)}) geçerli API anahtarınızı girip kaydedin.`);
   }
 
   const lastMsgText = messages.length > 0 ? messages[messages.length - 1].content : '';
@@ -258,7 +262,7 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
         return executeBYOKRequest(messages, settings, nextModel, nextAttempted);
       }
     }
-    throw new Error(`🔌 BYOK İnternet/Ağ Bağlantı Hatası: Sunucuya erişilemedi. (${netErr.message})`);
+    throw new Error(`🔌 ${isGroq ? 'Groq' : 'OpenRouter'} İnternet/Ağ Bağlantı Hatası: Sunucuya erişilemedi. (${netErr.message})`);
   }
 
   if (!response.ok) {
@@ -280,18 +284,18 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
     }
 
     if (response.status === 401) {
-      throw new Error(`🔑 Yetkilendirme Başarısız (BYOK 401): ${detail}. Lütfen API Anahtarınızı kontrol edin.`);
+      throw new Error(`🔑 Yetkilendirme Başarısız (${isGroq ? 'Groq' : 'OpenRouter'} 401): ${detail}. Lütfen API Anahtarınızı Eklenti Ayarlarından kontrol edip tekrar kaydedin.`);
     }
     if (response.status === 403) {
-      throw new Error(`🚫 Erişim Engellendi (BYOK 403): ${detail}. Lütfen bakiye ve izinlerinizi kontrol edin.`);
+      throw new Error(`🚫 Erişim Engellendi (${isGroq ? 'Groq' : 'OpenRouter'} 403): ${detail}. Lütfen bakiye ve izinlerinizi kontrol edin.`);
     }
     if (response.status === 404) {
-      throw new Error(`🔍 Model veya Endpoint Bulunamadı (BYOK 404 - Model: "${modelToUse}"): ${detail}.`);
+      throw new Error(`🔍 Model veya Endpoint Bulunamadı (${isGroq ? 'Groq' : 'OpenRouter'} 404 - Model: "${modelToUse}"): ${detail}.`);
     }
     if (response.status === 429) {
-      throw new Error(`⚠️ Kota / Hız Limiti Aşıldı (BYOK 429 - Model: "${modelToUse}"): ${detail}.`);
+      throw new Error(`⚠️ Kota / Hız Limiti Aşıldı (${isGroq ? 'Groq' : 'OpenRouter'} 429 - Model: "${modelToUse}"): ${detail}.`);
     }
-    throw new Error(`❌ BYOK API Hatası (${response.status} - Model: "${modelToUse}"): ${detail}`);
+    throw new Error(`❌ ${isGroq ? 'Groq' : 'OpenRouter'} API Hatası (${response.status} - Model: "${modelToUse}"): ${detail}`);
   }
 
   const result = await response.json();
@@ -332,84 +336,51 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
   };
 }
 
+function configName(isGroq) {
+  return isGroq ? 'Groq' : 'OpenRouter';
+}
+
 /**
- * Smart Router with Priority Mode Execution, Task Escalation & Automatic Secondary / Local AI Fallback
+ * Smart Router with Priority Mode Execution & Direct Clear Error Reporting
  */
 async function smartRouteCompletion(messages) {
   const settings = await getSettings();
   const usageMode = settings.usageMode || 'byok';
 
-  let hasBYOK = false;
-  if (settings.openrouterApiKey) {
-    const raw = await globalThis.CryptoVault?.decrypt(settings.openrouterApiKey);
-    if (raw && raw.trim()) hasBYOK = true;
-  }
-  if (!hasBYOK && settings.groqApiKey) {
-    const raw = await globalThis.CryptoVault?.decrypt(settings.groqApiKey);
-    if (raw && raw.trim()) hasBYOK = true;
-  }
+  const rawOpenRouterKey = await safeDecryptKey(settings.openrouterApiKey);
+  const rawGroqKey = await safeDecryptKey(settings.groqApiKey);
+  const rawGumroadKey = await safeDecryptKey(settings.gumroadLicenseKey);
 
-  let hasGumroad = false;
-  if (settings.gumroadLicenseKey) {
-    const raw = await globalThis.CryptoVault?.decrypt(settings.gumroadLicenseKey);
-    if (raw && raw.trim()) hasGumroad = true;
-  }
+  const hasBYOK = !!((rawOpenRouterKey && rawOpenRouterKey.trim()) || (rawGroqKey && rawGroqKey.trim()));
+  const hasGumroad = !!(rawGumroadKey && rawGumroadKey.trim());
 
-  // 1. Try Primary Chosen Mode
-  try {
-    if (usageMode === 'byok' && hasBYOK) {
-      return await executeBYOKRequest(messages, settings);
-    } else if (usageMode === 'gumroad' && hasGumroad) {
-      return await executeSupabaseRequest(messages, settings);
-    } else if (usageMode === 'chrome_local') {
-      const reply = await executeChromeLocalAI(messages);
-      return { reply, badge: '💻 Chrome Local AI (Gemini Nano - Cihaz İçi) kullanıldı.' };
+  // 1. Direct Execution based on chosen usage mode
+  if (usageMode === 'byok') {
+    if (!hasBYOK) {
+      throw new Error('🔑 OpenRouter / Groq API Anahtarı eksik. Lütfen Eklenti Ayarları (Options) sayfasından API anahtarınızı girip "Ayarları Şifreli Kaydet" butonuna basın.');
     }
-  } catch (primaryErr) {
-    console.warn(`[Smart Router] Primary mode (${usageMode}) failed:`, primaryErr.message);
-
-    // 2. Try Secondary Mode Fallback (BYOK <-> Gumroad)
-    if (usageMode === 'byok' && hasGumroad) {
-      try {
-        console.warn('[Smart Router] Falling back to secondary mode: Gumroad / Supabase Edge');
-        return await executeSupabaseRequest(messages, settings);
-      } catch (secErr) {
-        console.warn('[Smart Router] Secondary mode (Gumroad) failed:', secErr.message);
-      }
-    } else if (usageMode === 'gumroad' && hasBYOK) {
-      try {
-        console.warn('[Smart Router] Falling back to secondary mode: BYOK');
-        return await executeBYOKRequest(messages, settings);
-      } catch (secErr) {
-        console.warn('[Smart Router] Secondary mode (BYOK) failed:', secErr.message);
-      }
-    }
+    return await executeBYOKRequest(messages, settings);
   }
 
-  // If primary was BYOK/Gumroad but keys were missing, try the other if key exists
-  if (usageMode !== 'chrome_local') {
-    if (hasBYOK) {
-      try {
-        return await executeBYOKRequest(messages, settings);
-      } catch (e) {}
+  if (usageMode === 'gumroad') {
+    if (!hasGumroad) {
+      throw new Error('🔑 Gumroad Lisans Kodu eksik. Lütfen Eklenti Ayarları (Options) sayfasından Ceviz Pro lisans kodunuzu girin.');
     }
-    if (hasGumroad) {
-      try {
-        return await executeSupabaseRequest(messages, settings);
-      } catch (e) {}
-    }
+    return await executeSupabaseRequest(messages, settings);
   }
 
-  // 3. Last Resort Fallback: Chrome Local AI (window.ai)
-  try {
-    const localReply = await executeChromeLocalAI(messages);
-    return {
-      reply: localReply,
-      badge: '💡 API limitleriniz dolduğu veya sunucuya erişilemediği için yanıt cihaz içi AI (Chrome Local AI) tarafından üretilmiştir.'
-    };
-  } catch (localErr) {
-    throw new Error('❌ Tüm bağlantı yöntemleri ve yerel AI başarısız oldu. Lütfen API anahtarlarınızı veya lisansınızı kontrol edin.');
+  if (usageMode === 'chrome_local') {
+    const reply = await executeChromeLocalAI(messages);
+    return { reply, badge: '💻 Chrome Local AI (Gemini Nano - Cihaz İçi) kullanıldı.' };
   }
+
+  // Fallback default
+  if (hasBYOK) {
+    return await executeBYOKRequest(messages, settings);
+  }
+
+  const reply = await executeChromeLocalAI(messages);
+  return { reply, badge: '💻 Chrome Local AI (Gemini Nano) kullanıldı.' };
 }
 
 // Handle runtime messages from sidepanel and options
