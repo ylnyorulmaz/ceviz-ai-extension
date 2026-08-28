@@ -211,47 +211,75 @@
   <div class="container">
     <header>
       <h1>🥜 Ceviz.ai</h1>
-      <p>Akıllı Web Asistanı - Yönlendirme ve Güvenlik Ayarları</p>
+      <p>Akıllı Web Asistanı - Bağlantı ve Anahtar Yönetimi</p>
       <div class="security-badge">
-        🔒 Web Crypto API AES-GCM (Yerel Şifreli Depolama)
+        🔒 Web Crypto API AES-GCM (İzole Şifreli Depolama)
       </div>
     </header>
 
     <!-- Tab Buttons -->
     <div class="nav-tabs">
-      <button type="button" class="tab-btn active" data-tab="tab-router">🔀 Öncelikli Mod</button>
-      <button type="button" class="tab-btn" data-tab="tab-pro">🔑 Ceviz Pro (Gumroad)</button>
+      <button type="button" class="tab-btn active" data-tab="tab-router">🔀 Çalışma Modu</button>
       <button type="button" class="tab-btn" data-tab="tab-byok">🌐 BYOK (API Keys)</button>
+      <button type="button" class="tab-btn" data-tab="tab-pro">🔑 Ceviz Pro (Gumroad)</button>
     </div>
 
     <form id="settings-form">
-      <!-- TAB 1: Router & Priority Mode -->
+      <!-- TAB 1: Priority Mode -->
       <div id="tab-router" class="tab-content active">
         <div class="card">
-          <h2>🔀 Öncelikli Kullanım Modu (Active Provider Toggle)</h2>
+          <h2>🔀 Öncelikli Çalışma Modu</h2>
           <div class="form-group">
-            <label for="usage-mode">Birincil Çalışma Modu</label>
+            <label for="usage-mode">Birincil Bağlantı Modu</label>
             <select id="usage-mode">
               <option value="byok">Kişisel API Anahtarım (BYOK Modu - OpenRouter / Groq)</option>
               <option value="gumroad">Ceviz Pro Lisansı (Gumroad - Supabase Edge)</option>
               <option value="chrome_local">Chrome Local AI (Gemini Nano - Cihaz İçi)</option>
             </select>
             <div class="help-text">
-              <strong>Akıllı Akış:</strong> Seçilen mod ilk olarak denenir. Birincil yöntem başarısız olursa (limit aşımı, yetersiz bakiye vb.), ikinci yöntem otomatik denenir. İkisi de başarısız olursa son çare olarak cihaz içi <strong>Chrome Local AI</strong> kullanılır.
+              <strong>⚡ Otomatik Akıllı Model Yönlendirmesi:</strong> Model seçimi derdi tamamen kaldırılmıştır! Ceviz.ai, yazdığınız görevin karmaşıklığına göre en uygun yapay zeka modelini (Llama 3.3, Auto Router veya DeepSeek V3) arka planda otomatik olarak sizin yerinize seçer.
             </div>
           </div>
 
           <div class="form-group">
             <label for="byok-provider">BYOK İçi Aktif Sağlayıcı</label>
             <select id="byok-provider">
-              <option value="openrouter">OpenRouter (Claude 3.5, GPT-4o, Gemini vb.)</option>
-              <option value="groq">Groq (Llama 3.3 70B, Qwen 2.5 Coder vb.)</option>
+              <option value="openrouter">OpenRouter (Çoklu Model Ağı)</option>
+              <option value="groq">Groq (Ultra Hızlı Çip Ağı)</option>
             </select>
           </div>
         </div>
       </div>
 
-      <!-- TAB 2: Ceviz Pro Gumroad License -->
+      <!-- TAB 2: BYOK (API Keys Only - No Model Selection) -->
+      <div id="tab-byok" class="tab-content">
+        <!-- OpenRouter Card -->
+        <div class="card">
+          <h2>🌐 OpenRouter API Anahtarı</h2>
+          <div class="form-group">
+            <label for="openrouter-key">OpenRouter API Key</label>
+            <input type="password" id="openrouter-key" placeholder="sk-or-v1-..." />
+            <div class="help-text">
+              <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">openrouter.ai/keys</a> adresinden ücretsiz veya kredili anahtarınızı alabilirsiniz.<br>
+              🔒 <strong>Sıfır Log:</strong> API Anahtarınız doğrudan OpenRouter sunucularına iletilir, hiçbir ara sunucuya kaydedilmez.
+            </div>
+          </div>
+        </div>
+
+        <!-- Groq Card -->
+        <div class="card">
+          <h2>🚀 Groq API Anahtarı</h2>
+          <div class="form-group">
+            <label for="groq-key">Groq API Key</label>
+            <input type="password" id="groq-key" placeholder="gsk_..." />
+            <div class="help-text">
+              <a href="https://console.groq.com/keys" target="_blank" style="color: var(--accent-color);">console.groq.com/keys</a> adresinden anahtarınızı alabilirsiniz.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Ceviz Pro Gumroad License -->
       <div id="tab-pro" class="tab-content">
         <div class="card">
           <h2>🔑 Ceviz Pro Lisans Anahtarı (Gumroad)</h2>
@@ -259,59 +287,8 @@
             <label for="gumroad-key">Gumroad Lisans Kodu</label>
             <input type="password" id="gumroad-key" placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX" />
             <div class="help-text">
-              Gumroad üzerinden aldığınız Ceviz Pro lisans anahtarı.<br>
-              <strong>Nasıl Çalışır?</strong> Eklenti isteğinizi doğrudan Supabase Edge Function (<code>https://placeholder.supabase.co/functions/v1/chat</code>) adresine <code>Authorization: Bearer &lt;LISANS&gt;</code> başlığı ile iletir. Lisansınız cihaz içi AES-GCM ile şifrelenir.
+              Gumroad üzerinden aldığınız Ceviz Pro lisans anahtarı. Lisansınız izole cihaz içi depolamada saklanır.
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- TAB 3: BYOK (OpenRouter & Groq Keys) -->
-      <div id="tab-byok" class="tab-content">
-        <!-- OpenRouter Card -->
-        <div class="card">
-          <h2>🌐 OpenRouter Ayarları (BYOK)</h2>
-          <div class="form-group">
-            <label for="openrouter-key">OpenRouter API Key</label>
-            <input type="password" id="openrouter-key" placeholder="sk-or-v1-..." />
-            <div class="help-text">
-              <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">openrouter.ai/keys</a> adresinden alabilirsiniz.<br>
-              🔒 <strong>Sıfır Log:</strong> Kendi API anahtarınız doğrudan OpenRouter sunucularına iletilir, hiçbir ara sunucuya kaydedilmez.
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="openrouter-model">OpenRouter Model Seçimi</label>
-            <select id="openrouter-model">
-              <option value="auto_fallback">4 Kademeli Otomatik Fallback (Gemini Flash ➔ Llama 3 ➔ DeepSeek ➔ OpenRouter Free)</option>
-              <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash Exp (Ücretsiz)</option>
-              <option value="meta-llama/llama-3-8b-instruct:free">Llama 3 8B Instruct (Ücretsiz)</option>
-              <option value="deepseek/deepseek-chat:free">DeepSeek Chat (Ücretsiz)</option>
-              <option value="openrouter/free">OpenRouter Free Router</option>
-              <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
-              <option value="openai/gpt-4o">GPT-4o</option>
-              <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Groq Card -->
-        <div class="card">
-          <h2>🚀 Groq Ayarları (BYOK)</h2>
-          <div class="form-group">
-            <label for="groq-key">Groq API Key</label>
-            <input type="password" id="groq-key" placeholder="gsk_..." />
-            <div class="help-text">
-              <a href="https://console.groq.com/keys" target="_blank" style="color: var(--accent-color);">console.groq.com/keys</a> adresinden alabilirsiniz.
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="groq-model">Groq Model Seçimi</label>
-            <select id="groq-model">
-              <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Tavsiye Edilen)</option>
-              <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant</option>
-              <option value="qwen-2.5-coder-32b">Qwen 2.5 Coder 32B</option>
-              <option value="deepseek-r1-distill-llama-70b">DeepSeek R1 Distill Llama 70B</option>
-            </select>
           </div>
         </div>
       </div>

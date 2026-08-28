@@ -1,14 +1,12 @@
 /**
- * Ceviz.ai - Options UI Controller with Tabbed Navigation
+ * Ceviz.ai - Options UI Controller (API Keys & Mode Selection Only)
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
   const usageModeInput = document.getElementById('usage-mode');
   const byokProviderInput = document.getElementById('byok-provider');
   const openrouterKeyInput = document.getElementById('openrouter-key');
-  const openrouterModelInput = document.getElementById('openrouter-model');
   const groqKeyInput = document.getElementById('groq-key');
-  const groqModelInput = document.getElementById('groq-model');
   const gumroadKeyInput = document.getElementById('gumroad-key');
   const form = document.getElementById('settings-form');
   const statusDiv = document.getElementById('status');
@@ -45,8 +43,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const s = response.settings;
     if (s.usageMode) usageModeInput.value = s.usageMode;
     if (s.byokProvider) byokProviderInput.value = s.byokProvider;
-    if (s.openrouterModel) openrouterModelInput.value = s.openrouterModel;
-    if (s.groqModel) groqModelInput.value = s.groqModel;
 
     if (s.openrouterApiKey) openrouterKeyInput.value = cleanKey(s.openrouterApiKey);
     if (s.groqApiKey) groqKeyInput.value = cleanKey(s.groqApiKey);
@@ -66,15 +62,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       byokProvider: byokProviderInput.value,
       activeProvider: usageModeInput.value === 'byok' ? byokProviderInput.value : usageModeInput.value,
       openrouterApiKey: rawOpenRouter,
-      openrouterModel: openrouterModelInput.value,
+      openrouterModel: 'auto_fallback',
       groqApiKey: rawGroq,
-      groqModel: groqModelInput.value,
+      groqModel: 'llama-3.3-70b-versatile',
       gumroadLicenseKey: rawGumroad
     };
 
     await chrome.storage.local.set(newSettings);
 
-    showStatus('✅ Ayarlar izole yerel depolamaya (chrome.storage.local) başarıyla kaydedildi!', 'success');
+    showStatus('✅ API Anahtarlarınız yerel depolamaya (chrome.storage.local) güvenle kaydedildi!', 'success');
   });
 
   function showStatus(message, type) {
