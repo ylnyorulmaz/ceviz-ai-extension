@@ -5,9 +5,13 @@
  * requests, sidePanel behavior, and MCP Client tool call loops.
  */
 
-import { MCPClient } from './mcp-client.js';
+try {
+  importScripts('./mcp-client.js');
+} catch (e) {
+  console.warn('importScripts failed:', e);
+}
 
-const mcpClient = new MCPClient();
+const mcpClient = typeof globalThis.MCPClient !== 'undefined' ? new globalThis.MCPClient() : null;
 
 // Open side panel automatically when extension toolbar icon is clicked
 if (chrome.sidePanel?.setPanelBehavior) {
@@ -117,7 +121,7 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
     throw new Error(`🔑 ${config.name} API Key eksik. Lütfen Eklenti Seçenekleri (Ayarlar) sayfasından ${config.name} API anahtarınızı kaydedin.`);
   }
 
-  const toolsSchema = mcpClient.getOpenAIToolsSchema();
+  const toolsSchema = mcpClient?.getOpenAIToolsSchema ? mcpClient.getOpenAIToolsSchema() : undefined;
 
   const payload = {
     model: model,
@@ -168,7 +172,7 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
   }
 
   // Handle Tool Calls (MCP Loop)
-  if (choiceMessage.tool_calls && choiceMessage.tool_calls.length > 0) {
+  if (choiceMessage.tool_calls && choiceMessage.tool_calls.length > 0 && mcpClient) {
     const updatedMessages = [...messages, choiceMessage];
 
     for (const toolCall of choiceMessage.tool_calls) {

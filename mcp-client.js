@@ -5,7 +5,7 @@
  * and execution dispatch for OpenRouter and Groq APIs.
  */
 
-export class MCPClient {
+class MCPClient {
   constructor() {
     this.tools = new Map();
     this.registerBuiltInTools();
@@ -120,4 +120,8 @@ export class MCPClient {
       return { error: `Araç çalıştırma hatası: ${error.message}` };
     }
   }
+}
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.MCPClient = MCPClient;
 }
