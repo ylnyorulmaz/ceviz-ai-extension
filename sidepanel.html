@@ -77,7 +77,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-width: 90%;
+      max-width: 92%;
     }
 
     .message-group.user {
@@ -136,14 +136,15 @@
 
     /* ELA (Explain Like Age) Chips */
     .ela-container {
-      margin-top: 4px;
+      margin-top: 6px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
+      width: 100%;
     }
 
     .ela-title {
-      font-size: 0.72rem;
+      font-size: 0.74rem;
       color: var(--muted);
       font-weight: 600;
     }
@@ -159,7 +160,7 @@
       color: var(--accent);
       border: 1px solid rgba(56, 189, 248, 0.25);
       border-radius: 14px;
-      padding: 3px 9px;
+      padding: 4px 10px;
       font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
@@ -172,6 +173,83 @@
       color: #0f172a;
       border-color: var(--accent);
       transform: translateY(-1px);
+    }
+
+    /* ELA Rich Components */
+    .clarity-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      margin-top: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .clarity-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .clarity-bar-bg {
+      flex: 1;
+      height: 8px;
+      background: #334155;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .clarity-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8, #4ade80);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    .clarity-val {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #4ade80;
+    }
+
+    .next-steps-box {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .next-steps-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .next-step-chip {
+      background: rgba(74, 222, 128, 0.1);
+      color: #4ade80;
+      border: 1px solid rgba(74, 222, 128, 0.25);
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-block;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      transition: all 0.2s;
+    }
+
+    .next-step-chip:hover {
+      background: #4ade80;
+      color: #0f172a;
+      border-color: #4ade80;
     }
 
     footer {
