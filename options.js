@@ -1,11 +1,12 @@
 /**
- * Ceviz.ai - Options UI Controller with Client-Side Web Crypto API Encryption
+ * Ceviz.ai - Options UI Controller with Tabbed Navigation & AES-GCM Encryption
  */
 
 import { CryptoVault } from './crypto-vault.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const activeProviderInput = document.getElementById('active-provider');
+  const usageModeInput = document.getElementById('usage-mode');
+  const byokProviderInput = document.getElementById('byok-provider');
   const openrouterKeyInput = document.getElementById('openrouter-key');
   const openrouterModelInput = document.getElementById('openrouter-model');
   const groqKeyInput = document.getElementById('groq-key');
@@ -13,12 +14,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   const gumroadKeyInput = document.getElementById('gumroad-key');
   const form = document.getElementById('settings-form');
   const statusDiv = document.getElementById('status');
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  // Tab switching logic
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.getAttribute('data-tab');
+      tabBtns.forEach(b => b.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(targetTab)?.classList.add('active');
+    });
+  });
 
   // Load and decrypt saved settings
   const response = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
   if (response?.success && response.settings) {
     const s = response.settings;
-    if (s.activeProvider) activeProviderInput.value = s.activeProvider;
+    if (s.usageMode) usageModeInput.value = s.usageMode;
+    if (s.byokProvider) byokProviderInput.value = s.byokProvider;
     if (s.openrouterModel) openrouterModelInput.value = s.openrouterModel;
     if (s.groqModel) groqModelInput.value = s.groqModel;
 
@@ -48,7 +63,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const encryptedGumroad = rawGumroad ? await CryptoVault.encrypt(rawGumroad) : '';
 
     const newSettings = {
-      activeProvider: activeProviderInput.value,
+      usageMode: usageModeInput.value,
+      byokProvider: byokProviderInput.value,
+      activeProvider: usageModeInput.value === 'byok' ? byokProviderInput.value : usageModeInput.value,
       openrouterApiKey: encryptedOpenRouter,
       openrouterModel: openrouterModelInput.value,
       groqApiKey: encryptedGroq,
@@ -58,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await chrome.storage.local.set(newSettings);
 
-    showStatus('🔒 Ayarlar AES-GCM 256-bit ile şifrelenerek güvenle kaydedildi!', 'success');
+    showStatus('🔒 Ayarlar ve Lisans Anahtarı AES-GCM 256-bit ile şifrelenerek kaydedildi!', 'success');
   });
 
   function showStatus(message, type) {
