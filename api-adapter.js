@@ -56,6 +56,25 @@
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const originalFetch = globalThis.fetch.bind(globalThis);
+  const NativeWebSocket = globalThis.WebSocket;
+  if (NativeWebSocket) {
+    globalThis.WebSocket = function(url, protocols) {
+      if (typeof url === 'string' && (url.includes('bridge.claudeusercontent.com') || url.includes('claude.ai'))) {
+        console.log('[API Adapter] Suppressing bridge WebSocket connection:', url);
+        return {
+          readyState: 3,
+          CLOSED: 3,
+          send() {},
+          close() {},
+          addEventListener() {},
+          removeEventListener() {}
+        };
+      }
+      return new NativeWebSocket(url, protocols);
+    };
+    globalThis.WebSocket.prototype = NativeWebSocket.prototype;
+  }
+
   const registry = globalThis.BrowserKingRegistry || null;
 
   async function writeDebugLog(entry) {
