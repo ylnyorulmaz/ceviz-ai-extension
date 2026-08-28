@@ -1012,6 +1012,34 @@
     };
   }
 
+  function formatProviderError(status, errorText, provider) {
+    const providerName = provider?.label || provider?.id || 'Provider';
+    let detail = errorText;
+    try {
+      const parsed = JSON.parse(errorText);
+      if (parsed.error?.message) {
+        detail = parsed.error.message;
+      } else if (parsed.message) {
+        detail = parsed.message;
+      }
+    } catch (e) {}
+
+    if (status === 401) {
+      return `🔑 Authentication Failed (${providerName} 401): ${detail}. Please check your API key in Extension Settings.`;
+    }
+    if (status === 403) {
+      return `🚫 Access Denied / Quota Exceeded (${providerName} 403): ${detail}. Please check your API key permissions and credit balance.`;
+    }
+    if (status === 429) {
+      return `⚠️ Rate Limit Exceeded (${providerName} 429): ${detail}. Please wait a moment or check your rate limits.`;
+    }
+    if (status === 404) {
+      return `🔍 Endpoint or Model Not Found (${providerName} 404): ${detail}. Please check the selected model and base URL.`;
+    }
+
+    return `❌ ${providerName} Error (${status}): ${detail}`;
+  }
+
   async function proxyAnthropicMessages(input, init) {
     const headers = mergeHeaders(input, init);
     const anthropicRequest = await readJsonBody(input, init);
@@ -1020,9 +1048,13 @@
     const requestedModel = resolveTargetModel(anthropicRequest, provider);
 
     if (!provider.apiKey && globalThis.chrome?.storage?.local) {
-      const extra = await chrome.storage.local.get(['anthropicApiKey', 'openrouterApiKey']);
-      if (extra.openrouterApiKey && provider.id === 'openrouter') {
+      const extra = await chrome.storage.local.get(['anthropicApiKey', 'openrouterApiKey', 'groqApiKey', 'browserKingProviderState']);
+      if (extra.browserKingProviderState?.providers?.[provider.id]?.apiKey) {
+        provider.apiKey = extra.browserKingProviderState.providers[provider.id].apiKey.trim();
+      } else if (extra.openrouterApiKey && provider.id === 'openrouter') {
         provider.apiKey = extra.openrouterApiKey.trim();
+      } else if (extra.groqApiKey && provider.id === 'groq') {
+        provider.apiKey = extra.groqApiKey.trim();
       } else if (extra.anthropicApiKey && !['custom-provider-key', 'browserking-key'].includes(extra.anthropicApiKey)) {
         provider.apiKey = extra.anthropicApiKey.trim();
       }
@@ -1030,7 +1062,7 @@
 
     if (!provider.apiKey && provider.id !== 'ollama') {
       console.warn(`[API Adapter] API Key is missing for active provider: ${provider.id}`);
-      return createAnthropicError(`API Key for ${provider.label || provider.id} is missing or not saved. Please open Extension Settings (Options) -> ${provider.label || provider.id} and click "Save Settings" or "Set Active".`, 401);
+      return createAnthropicError(`🔑 API Key is missing for ${provider.label || provider.id}. Please open Extension Options -> enter your ${provider.label || provider.id} API key -> click "Save Settings".`, 401);
     }
 
     headers.set('Content-Type', 'application/json');
@@ -1083,7 +1115,7 @@
           status: response.status,
           body: errorText
         });
-        return createAnthropicError(`Provider error (${response.status}): ${errorText}`, response.status);
+        return createAnthropicError(formatProviderError(response.status, errorText, provider), response.status);
       }
 
       return response;
@@ -1130,7 +1162,7 @@
       });
     } catch (error) {
       console.error('[API Adapter] Upstream fetch failed:', error);
-      return createAnthropicError(error.message || 'Failed to reach upstream provider.', 502);
+      return createAnthropicError(`🔌 Network Connection Error: Unable to reach ${provider.label || provider.id} at ${upstreamUrl}. (${error.message})`, 502);
     }
 
     const contentType = upstreamResponse.headers.get('content-type') || '';
@@ -1172,7 +1204,7 @@
               body: retryErrorText
             });
             console.error('[API Adapter] Upstream error after retry:', upstreamResponse.status, retryErrorText);
-            return createAnthropicError(`Provider error (${upstreamResponse.status}): ${retryErrorText}`, upstreamResponse.status);
+            return createAnthropicError(formatProviderError(upstreamResponse.status, retryErrorText, provider), upstreamResponse.status);
           }
         } catch (retryError) {
           console.error('[API Adapter] Retry without images failed:', retryError);
@@ -1185,7 +1217,7 @@
           status: upstreamResponse.status,
           body: errorText
         });
-        return createAnthropicError(`Provider error (${upstreamResponse.status}): ${errorText}`, upstreamResponse.status);
+        return createAnthropicError(formatProviderError(upstreamResponse.status, errorText, provider), upstreamResponse.status);
       }
     }
 
