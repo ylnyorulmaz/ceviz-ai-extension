@@ -26,23 +26,43 @@
   ];
 
   function replaceText(root) {
-    const targetNode = (root && root.nodeType) ? root : (document.body || document.documentElement);
-    if (!targetNode) return;
-    const walker = document.createTreeWalker(targetNode, NodeFilter.SHOW_TEXT);
-    while (walker.nextNode()) {
-      const node = walker.currentNode;
-      if (!node.nodeValue || !node.nodeValue.trim()) {
-        continue;
+    let targetNode = null;
+    if (root && typeof root === 'object' && typeof root.nodeType === 'number') {
+      targetNode = root;
+    } else if (document.body && typeof document.body.nodeType === 'number') {
+      targetNode = document.body;
+    } else if (document.documentElement && typeof document.documentElement.nodeType === 'number') {
+      targetNode = document.documentElement;
+    }
+
+    if (!targetNode) {
+      return;
+    }
+
+    try {
+      const showTextFilter = (globalThis.NodeFilter && globalThis.NodeFilter.SHOW_TEXT) || 4;
+      const walker = document.createTreeWalker(targetNode, showTextFilter, null);
+      if (!walker) {
+        return;
       }
 
-      let nextValue = node.nodeValue;
-      replacements.forEach(([from, to]) => {
-        nextValue = nextValue.split(from).join(to);
-      });
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        if (!node || !node.nodeValue || !node.nodeValue.trim()) {
+          continue;
+        }
 
-      if (nextValue !== node.nodeValue) {
-        node.nodeValue = nextValue;
+        let nextValue = node.nodeValue;
+        replacements.forEach(([from, to]) => {
+          nextValue = nextValue.split(from).join(to);
+        });
+
+        if (nextValue !== node.nodeValue) {
+          node.nodeValue = nextValue;
+        }
       }
+    } catch (e) {
+      // Ignore tree walker execution errors on detaching DOM nodes
     }
   }
 
@@ -327,11 +347,13 @@
       .replace('Claude for Chrome', registry.BRAND.name)
       .replace('Claude Options', `${registry.BRAND.name} Settings`)
       .replace('New Tab', registry.BRAND.name);
-    replaceText(document.body);
+    replaceText();
   }
 
-  const observer = new MutationObserver(() => replaceText(document.body));
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  if (document.documentElement) {
+    const observer = new MutationObserver(() => replaceText());
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.browserKingProviderState) {
