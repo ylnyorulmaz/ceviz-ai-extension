@@ -1,8 +1,7 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * 100% Self-Contained Service Worker with Zero External importScripts Dependencies.
- * Eliminates "An unknown error occurred when fetching the script" permanently.
+ * 100% Self-Contained Service Worker with Smart Provider Key Detection
  */
 
 // --- MCP Client Module (Inlined for 0-fetch reliability) ---
@@ -275,20 +274,29 @@ async function executeSupabaseRequest(messages, settings) {
 }
 
 /**
- * Execute BYOK Request directly to OpenRouter or Groq with 4-tier fallback and Smart Escalation
+ * Execute BYOK Request directly to OpenRouter or Groq with Smart Auto Provider Detection
  */
 async function executeBYOKRequest(messages, settings, targetModelOverride = null, attemptedModels = []) {
-  const providerKey = settings.byokProvider || settings.activeProvider || 'openrouter';
+  const openRouterKey = sanitizeApiKey(settings.openrouterApiKey);
+  const groqKey = sanitizeApiKey(settings.groqApiKey);
+
+  // Smart Auto Provider Detection: Use whichever key is entered by user
+  let providerKey = settings.byokProvider || 'openrouter';
+  if (openRouterKey && !groqKey) {
+    providerKey = 'openrouter';
+  } else if (groqKey && !openRouterKey) {
+    providerKey = 'groq';
+  }
+
   const isGroq = providerKey === 'groq';
   const baseUrl = isGroq
     ? 'https://api.groq.com/openai/v1/chat/completions'
     : 'https://openrouter.ai/api/v1/chat/completions';
 
-  const rawKeyStored = isGroq ? settings.groqApiKey : settings.openrouterApiKey;
-  const rawApiKey = sanitizeApiKey(rawKeyStored);
+  const rawApiKey = isGroq ? groqKey : openRouterKey;
 
   if (!rawApiKey) {
-    throw new Error(`🔑 BYOK API Key eksik veya geçersiz (${isGroq ? 'Groq' : 'OpenRouter'}). Lütfen Eklenti Ayarlarından (${configName(isGroq)}) API anahtarınızı girip kaydedin.`);
+    throw new Error(`🔑 BYOK API Key eksik. Lütfen Eklenti Ayarları (Options) sayfasından OpenRouter veya Groq API anahtarınızı girip "Ayarları Şifreli Kaydet" butonuna basın.`);
   }
 
   const lastMsgText = messages.length > 0 ? messages[messages.length - 1].content : '';
