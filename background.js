@@ -19,7 +19,7 @@ if (chrome.sidePanel?.setPanelBehavior) {
 const DEFAULT_SETTINGS = {
   activeProvider: 'openrouter',
   openrouterApiKey: '',
-  openrouterModel: 'google/gemini-2.0-flash-001',
+  openrouterModel: 'openrouter/auto',
   groqApiKey: '',
   groqModel: 'llama-3.3-70b-versatile'
 };
