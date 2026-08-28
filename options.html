@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ceviz.ai - Ayarlar</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent-color: #38bdf8;
+      --text-color: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+      --success-color: #4ade80;
+      --error-color: #f87171;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 650px;
+    }
+
+    header {
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      margin: 0 0 10px 0;
+      color: var(--accent-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.25rem;
+      margin-top: 0;
+      margin-bottom: 16px;
+      color: var(--text-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-color);
+    }
+
+    select, input[type="password"], input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: #0f172a;
+      color: var(--text-color);
+      font-size: 0.95rem;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--accent-color);
+    }
+
+    .help-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .btn {
+      background: var(--accent-color);
+      color: #0f172a;
+      font-weight: 700;
+      border: none;
+      padding: 14px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .status-msg {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+      text-align: center;
+    }
+
+    .status-msg.success {
+      display: block;
+      background: rgba(74, 222, 128, 0.15);
+      color: var(--success-color);
+      border: 1px solid var(--success-color);
+    }
+
+    .status-msg.error {
+      display: block;
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--error-color);
+      border: 1px solid var(--error-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🥜 Ceviz.ai</h1>
+      <p>Akıllı Web Asistanı - API ve Model Ayarları</p>
+    </header>
+
+    <form id="settings-form">
+      <!-- Active Provider Selection -->
+      <div class="card">
+        <h2>⚡ Aktif AI Sağlayıcısı</h2>
+        <div class="form-group">
+          <label for="active-provider">Varsayılan Sağlayıcı</label>
+          <select id="active-provider">
+            <option value="openrouter">OpenRouter (Claude 3.5, GPT-4o, Gemini vb.)</option>
+            <option value="groq">Groq (Llama 3.3 70B, Qwen 2.5 Coder vb.)</option>
+          </select>
+          <div class="help-text">Tüm sohbet ve araç kullanımı seçtiğiniz sağlayıcı üzerinden gerçekleşir.</div>
+        </div>
+      </div>
+
+      <!-- OpenRouter Settings -->
+      <div class="card">
+        <h2>🌐 OpenRouter Ayarları</h2>
+        <div class="form-group">
+          <label for="openrouter-key">OpenRouter API Key</label>
+          <input type="password" id="openrouter-key" placeholder="sk-or-v1-..." />
+          <div class="help-text"><a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">openrouter.ai/keys</a> adresinden alabilirsiniz.</div>
+        </div>
+        <div class="form-group">
+          <label for="openrouter-model">Varsayılan Model</label>
+          <select id="openrouter-model">
+            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Tavsiye Edilen)</option>
+            <option value="openai/gpt-4o">GPT-4o</option>
+            <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+            <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+            <option value="deepseek/deepseek-r1">DeepSeek R1</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Groq Settings -->
+      <div class="card">
+        <h2>🚀 Groq Ayarları</h2>
+        <div class="form-group">
+          <label for="groq-key">Groq API Key</label>
+          <input type="password" id="groq-key" placeholder="gsk_..." />
+          <div class="help-text"><a href="https://console.groq.com/keys" target="_blank" style="color: var(--accent-color);">console.groq.com/keys</a> adresinden alabilirsiniz.</div>
+        </div>
+        <div class="form-group">
+          <label for="groq-model">Varsayılan Model</label>
+          <select id="groq-model">
+            <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Tavsiye Edilen)</option>
+            <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant</option>
+            <option value="qwen-2.5-coder-32b">Qwen 2.5 Coder 32B</option>
+            <option value="deepseek-r1-distill-llama-70b">DeepSeek R1 Distill Llama 70B</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="submit" class="btn">Ayarları Kaydet</button>
+      <div id="status" class="status-msg"></div>
+    </form>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

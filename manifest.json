@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Ceviz.ai",
+  "version": "1.0.0",
+  "description": "Akıllı Web Asistanı",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Ceviz.ai",
+    "default_popup": "popup.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}
