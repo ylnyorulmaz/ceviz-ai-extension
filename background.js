@@ -1,12 +1,14 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * Handles background operations, OpenRouter, Groq, and Chrome Local AI (Gemini Nano)
- * requests, sidePanel behavior, MCP Client tool call loops, and 4-tier fallback logic.
+ * Handles background operations, OpenRouter, Groq, Chrome Local AI (window.ai)
+ * requests, sidePanel behavior, MCP Client tool call loops, 4-tier fallback logic,
+ * and W3C Web Crypto API AES-GCM 256-bit transient decryption.
  */
 
 try {
   importScripts('./mcp-client.js');
+  importScripts('./crypto-vault.js');
 } catch (e) {
   console.warn('importScripts failed:', e);
 }
@@ -33,7 +35,8 @@ const DEFAULT_SETTINGS = {
   openrouterApiKey: '',
   openrouterModel: 'auto_fallback',
   groqApiKey: '',
-  groqModel: 'llama-3.3-70b-versatile'
+  groqModel: 'llama-3.3-70b-versatile',
+  gumroadLicenseKey: ''
 };
 
 const PROVIDER_CONFIGS = {
@@ -94,7 +97,8 @@ async function getSettings() {
 }
 
 /**
- * Perform completion request with tool use loop and 4-tier fallback support
+ * Perform completion request with tool use loop, 4-tier fallback support,
+ * and transient AES-GCM key decryption
  */
 async function generateCompletion(messages, customProvider = null, targetModelOverride = null, attemptedModels = []) {
   const settings = await getSettings();
@@ -122,8 +126,16 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
     throw new Error(`Bilinmeyen sağlayıcı: ${providerKey}`);
   }
 
-  const apiKey = providerKey === 'openrouter' ? settings.openrouterApiKey : settings.groqApiKey;
-  if (!apiKey || !apiKey.trim()) {
+  // Transient Decryption: Decrypt stored key ONLY for the duration of this fetch request
+  const encryptedKey = providerKey === 'openrouter' ? settings.openrouterApiKey : settings.groqApiKey;
+  let rawApiKey = '';
+  if (encryptedKey && globalThis.CryptoVault) {
+    rawApiKey = await globalThis.CryptoVault.decrypt(encryptedKey);
+  } else {
+    rawApiKey = encryptedKey || '';
+  }
+
+  if (!rawApiKey || !rawApiKey.trim()) {
     throw new Error(`🔑 ${config.name} API Key eksik. Lütfen Eklenti Seçenekleri (Ayarlar) sayfasından ${config.name} API anahtarınızı kaydedin.`);
   }
 
@@ -149,9 +161,10 @@ async function generateCompletion(messages, customProvider = null, targetModelOv
 
   let response;
   try {
+    // BYOK Direct Request: Sends directly to OpenRouter/Groq endpoints bypassing custom servers
     response = await fetch(config.baseUrl, {
       method: 'POST',
-      headers: config.getHeaders(apiKey.trim()),
+      headers: config.getHeaders(rawApiKey.trim()),
       body: JSON.stringify(payload)
     });
   } catch (netErr) {

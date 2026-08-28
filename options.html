@@ -51,6 +51,20 @@
       margin: 0;
     }
 
+    .security-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-color);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 10px;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
@@ -107,6 +121,7 @@
       font-size: 0.8rem;
       color: var(--text-muted);
       margin-top: 6px;
+      line-height: 1.4;
     }
 
     .btn {
@@ -154,7 +169,10 @@
   <div class="container">
     <header>
       <h1>🥜 Ceviz.ai</h1>
-      <p>Akıllı Web Asistanı - API ve Model Ayarları</p>
+      <p>Akıllı Web Asistanı - Güvenli API ve Lisans Yönetimi</p>
+      <div class="security-badge">
+        🔒 Web Crypto API AES-GCM (İzole Şifreli Depolama)
+      </div>
     </header>
 
     <form id="settings-form">
@@ -172,13 +190,16 @@
         </div>
       </div>
 
-      <!-- OpenRouter Settings -->
+      <!-- OpenRouter Settings (BYOK) -->
       <div class="card">
-        <h2>🌐 OpenRouter Ayarları</h2>
+        <h2>🌐 OpenRouter Ayarları (BYOK Modu)</h2>
         <div class="form-group">
           <label for="openrouter-key">OpenRouter API Key</label>
           <input type="password" id="openrouter-key" placeholder="sk-or-v1-..." />
-          <div class="help-text"><a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">openrouter.ai/keys</a> adresinden alabilirsiniz.</div>
+          <div class="help-text">
+            <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">openrouter.ai/keys</a> adresinden alabilirsiniz.<br>
+            🔒 <strong>Sıfır Log Gizliliği:</strong> API Anahtarınız Web Crypto API (AES-GCM) ile cihazınızda şifrelenir ve hiçbir sunucumuza iletilmeden direkt OpenRouter'a gönderilir.
+          </div>
         </div>
         <div class="form-group">
           <label for="openrouter-model">Varsayılan Model</label>
@@ -195,13 +216,15 @@
         </div>
       </div>
 
-      <!-- Groq Settings -->
+      <!-- Groq Settings (BYOK) -->
       <div class="card">
-        <h2>🚀 Groq Ayarları</h2>
+        <h2>🚀 Groq Ayarları (BYOK Modu)</h2>
         <div class="form-group">
           <label for="groq-key">Groq API Key</label>
           <input type="password" id="groq-key" placeholder="gsk_..." />
-          <div class="help-text"><a href="https://console.groq.com/keys" target="_blank" style="color: var(--accent-color);">console.groq.com/keys</a> adresinden alabilirsiniz.</div>
+          <div class="help-text">
+            <a href="https://console.groq.com/keys" target="_blank" style="color: var(--accent-color);">console.groq.com/keys</a> adresinden alabilirsiniz.
+          </div>
         </div>
         <div class="form-group">
           <label for="groq-model">Varsayılan Model</label>
@@ -214,11 +237,23 @@
         </div>
       </div>
 
-      <button type="submit" class="btn">Ayarları Kaydet</button>
+      <!-- Gumroad License Key -->
+      <div class="card">
+        <h2>🔑 Gumroad Lisans Anahtarı</h2>
+        <div class="form-group">
+          <label for="gumroad-key">Lisans Anahtarı</label>
+          <input type="password" id="gumroad-key" placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX" />
+          <div class="help-text">
+            Gumroad üzerinden aldığınız Ceviz.ai lisans anahtarı. Lisansınız güvenli cihaz içi şifrelenmiş depolamada saklanır.
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn">Ayarları Şifreli Kaydet</button>
       <div id="status" class="status-msg"></div>
     </form>
   </div>
 
-  <script src="options.js"></script>
+  <script type="module" src="options.js"></script>
 </body>
 </html>
