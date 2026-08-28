@@ -1,8 +1,6 @@
 /**
- * Ceviz.ai - Options UI Controller with Tabbed Navigation & AES-GCM Encryption
+ * Ceviz.ai - Options UI Controller with Tabbed Navigation
  */
-
-import { CryptoVault } from './crypto-vault.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   const usageModeInput = document.getElementById('usage-mode');
@@ -28,7 +26,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Load and decrypt saved settings
+  // Helper to extract clean key from stored string
+  function cleanKey(val) {
+    if (!val || typeof val !== 'string') return '';
+    const trimmed = val.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed.v || parsed.iv) return ''; // Clear corrupted JSON string
+      } catch (e) {}
+    }
+    return trimmed;
+  }
+
+  // Load saved settings
   const response = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
   if (response?.success && response.settings) {
     const s = response.settings;
@@ -37,45 +48,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (s.openrouterModel) openrouterModelInput.value = s.openrouterModel;
     if (s.groqModel) groqModelInput.value = s.groqModel;
 
-    // Decrypt keys for user display in password fields
-    if (s.openrouterApiKey) {
-      openrouterKeyInput.value = await CryptoVault.decrypt(s.openrouterApiKey);
-    }
-    if (s.groqApiKey) {
-      groqKeyInput.value = await CryptoVault.decrypt(s.groqApiKey);
-    }
-    if (s.gumroadLicenseKey) {
-      gumroadKeyInput.value = await CryptoVault.decrypt(s.gumroadLicenseKey);
-    }
+    if (s.openrouterApiKey) openrouterKeyInput.value = cleanKey(s.openrouterApiKey);
+    if (s.groqApiKey) groqKeyInput.value = cleanKey(s.groqApiKey);
+    if (s.gumroadLicenseKey) gumroadKeyInput.value = cleanKey(s.gumroadLicenseKey);
   }
 
-  // Save settings with AES-GCM 256 encryption at rest
+  // Save settings in isolated chrome.storage.local
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const rawOpenRouter = openrouterKeyInput.value.trim();
-    const rawGroq = groqKeyInput.value.trim();
-    const rawGumroad = gumroadKeyInput.value.trim();
-
-    // Encrypt sensitive keys before writing to chrome.storage.local
-    const encryptedOpenRouter = rawOpenRouter ? await CryptoVault.encrypt(rawOpenRouter) : '';
-    const encryptedGroq = rawGroq ? await CryptoVault.encrypt(rawGroq) : '';
-    const encryptedGumroad = rawGumroad ? await CryptoVault.encrypt(rawGumroad) : '';
+    const rawOpenRouter = cleanKey(openrouterKeyInput.value);
+    const rawGroq = cleanKey(groqKeyInput.value);
+    const rawGumroad = cleanKey(gumroadKeyInput.value);
 
     const newSettings = {
       usageMode: usageModeInput.value,
       byokProvider: byokProviderInput.value,
       activeProvider: usageModeInput.value === 'byok' ? byokProviderInput.value : usageModeInput.value,
-      openrouterApiKey: encryptedOpenRouter,
+      openrouterApiKey: rawOpenRouter,
       openrouterModel: openrouterModelInput.value,
-      groqApiKey: encryptedGroq,
+      groqApiKey: rawGroq,
       groqModel: groqModelInput.value,
-      gumroadLicenseKey: encryptedGumroad
+      gumroadLicenseKey: rawGumroad
     };
 
     await chrome.storage.local.set(newSettings);
 
-    showStatus('🔒 Ayarlar ve Lisans Anahtarı AES-GCM 256-bit ile şifrelenerek kaydedildi!', 'success');
+    showStatus('✅ Ayarlar izole yerel depolamaya (chrome.storage.local) başarıyla kaydedildi!', 'success');
   });
 
   function showStatus(message, type) {

@@ -2,16 +2,15 @@
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
  * Smart Router Architecture:
- * 1. BYOK Mode (Direct OpenRouter / Groq HTTPS fetch)
+ * 1. BYOK Mode (Direct OpenRouter / Groq HTTPS fetch with clean headers)
  * 2. Gumroad License Mode (Supabase Edge Function: https://placeholder.supabase.co/functions/v1/chat)
  * 3. Smart Model Escalation (Task Complexity Router with 100% Live Verified Models)
  * 4. 4-Tier Fallback for OpenRouter
- * 5. Explicit Error Reporting (No Silent Error Swallowing)
+ * 5. Explicit Error Reporting
  */
 
 try {
   importScripts('./mcp-client.js');
-  importScripts('./crypto-vault.js');
 } catch (e) {
   console.warn('importScripts failed:', e);
 }
@@ -122,17 +121,18 @@ async function getSettings() {
 }
 
 /**
- * Safely decrypt or return key string
+ * Ensures key is a clean non-JSON string
  */
-async function safeDecryptKey(encryptedOrRawKey) {
-  if (!encryptedOrRawKey || typeof encryptedOrRawKey !== 'string') return '';
-  if (!globalThis.CryptoVault) return encryptedOrRawKey;
-  try {
-    const decrypted = await globalThis.CryptoVault.decrypt(encryptedOrRawKey);
-    return decrypted || encryptedOrRawKey;
-  } catch (e) {
-    return encryptedOrRawKey;
+function sanitizeApiKey(val) {
+  if (!val || typeof val !== 'string') return '';
+  let str = val.trim();
+  if (str.startsWith('{') && str.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (parsed.v || parsed.iv) return '';
+    } catch (e) {}
   }
+  return str;
 }
 
 /**
@@ -158,10 +158,10 @@ async function executeChromeLocalAI(messages) {
  * Execute Supabase Edge Function with Gumroad License Authorization header
  */
 async function executeSupabaseRequest(messages, settings) {
-  const rawLicense = await safeDecryptKey(settings.gumroadLicenseKey);
+  const rawLicense = sanitizeApiKey(settings.gumroadLicenseKey);
 
-  if (!rawLicense || !rawLicense.trim()) {
-    throw new Error('🔑 Gumroad Lisans Anahtarı eksik. Lütfen Ceviz Pro lisans kodunuzu Eklenti Ayarlarından girin.');
+  if (!rawLicense) {
+    throw new Error('🔑 Gumroad Lisans Anahtarı eksik. Lütfen Ceviz Pro lisans kodunuzu Eklenti Ayarlarından girip kaydedin.');
   }
 
   const payload = {
@@ -172,7 +172,7 @@ async function executeSupabaseRequest(messages, settings) {
   const response = await fetch(SUPABASE_EDGE_ENDPOINT, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${rawLicense.trim()}`,
+      'Authorization': `Bearer ${rawLicense}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
@@ -203,11 +203,11 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
     ? 'https://api.groq.com/openai/v1/chat/completions'
     : 'https://openrouter.ai/api/v1/chat/completions';
 
-  const encryptedKey = isGroq ? settings.groqApiKey : settings.openrouterApiKey;
-  const rawApiKey = await safeDecryptKey(encryptedKey);
+  const rawKeyStored = isGroq ? settings.groqApiKey : settings.openrouterApiKey;
+  const rawApiKey = sanitizeApiKey(rawKeyStored);
 
-  if (!rawApiKey || !rawApiKey.trim()) {
-    throw new Error(`🔑 BYOK API Key eksik (${isGroq ? 'Groq' : 'OpenRouter'}). Lütfen Eklenti Ayarlarından (${configName(isGroq)}) geçerli API anahtarınızı girip kaydedin.`);
+  if (!rawApiKey) {
+    throw new Error(`🔑 BYOK API Key eksik veya geçersiz (${isGroq ? 'Groq' : 'OpenRouter'}). Lütfen Eklenti Ayarlarından (${configName(isGroq)}) API anahtarınızı girip kaydedin.`);
   }
 
   const lastMsgText = messages.length > 0 ? messages[messages.length - 1].content : '';
@@ -231,10 +231,10 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
   const toolsSchema = mcpClient?.getOpenAIToolsSchema ? mcpClient.getOpenAIToolsSchema() : undefined;
 
   const headers = isGroq ? {
-    'Authorization': `Bearer ${rawApiKey.trim()}`,
+    'Authorization': `Bearer ${rawApiKey}`,
     'Content-Type': 'application/json'
   } : {
-    'Authorization': `Bearer ${rawApiKey.trim()}`,
+    'Authorization': `Bearer ${rawApiKey}`,
     'HTTP-Referer': 'https://github.com/ylnyorulmaz/ceviz-ai-extension',
     'X-Title': 'Ceviz.ai Browser Assistant',
     'Content-Type': 'application/json'
@@ -284,7 +284,7 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
     }
 
     if (response.status === 401) {
-      throw new Error(`🔑 Yetkilendirme Başarısız (${isGroq ? 'Groq' : 'OpenRouter'} 401): ${detail}. Lütfen API Anahtarınızı Eklenti Ayarlarından kontrol edip tekrar kaydedin.`);
+      throw new Error(`🔑 Yetkilendirme Başarısız (${isGroq ? 'Groq' : 'OpenRouter'} 401): ${detail}. Lütfen Eklenti Ayarlarından (${configName(isGroq)}) API Anahtarınızı kontrol edip tekrar "Ayarları Şifreli Kaydet" butonuna basın.`);
     }
     if (response.status === 403) {
       throw new Error(`🚫 Erişim Engellendi (${isGroq ? 'Groq' : 'OpenRouter'} 403): ${detail}. Lütfen bakiye ve izinlerinizi kontrol edin.`);
@@ -347,12 +347,12 @@ async function smartRouteCompletion(messages) {
   const settings = await getSettings();
   const usageMode = settings.usageMode || 'byok';
 
-  const rawOpenRouterKey = await safeDecryptKey(settings.openrouterApiKey);
-  const rawGroqKey = await safeDecryptKey(settings.groqApiKey);
-  const rawGumroadKey = await safeDecryptKey(settings.gumroadLicenseKey);
+  const rawOpenRouterKey = sanitizeApiKey(settings.openrouterApiKey);
+  const rawGroqKey = sanitizeApiKey(settings.groqApiKey);
+  const rawGumroadKey = sanitizeApiKey(settings.gumroadLicenseKey);
 
-  const hasBYOK = !!((rawOpenRouterKey && rawOpenRouterKey.trim()) || (rawGroqKey && rawGroqKey.trim()));
-  const hasGumroad = !!(rawGumroadKey && rawGumroadKey.trim());
+  const hasBYOK = !!(rawOpenRouterKey || rawGroqKey);
+  const hasGumroad = !!rawGumroadKey;
 
   // 1. Direct Execution based on chosen usage mode
   if (usageMode === 'byok') {
