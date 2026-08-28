@@ -1,21 +1,102 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * Smart Router Architecture:
- * 1. BYOK Mode (Direct OpenRouter / Groq HTTPS fetch with clean headers)
- * 2. Gumroad License Mode (Supabase Edge Function: https://placeholder.supabase.co/functions/v1/chat)
- * 3. Smart Model Escalation (Task Complexity Router with 100% Live Verified Models)
- * 4. 4-Tier Fallback for OpenRouter
- * 5. Explicit Error Reporting
+ * 100% Self-Contained Service Worker with Zero External importScripts Dependencies.
+ * Eliminates "An unknown error occurred when fetching the script" permanently.
  */
 
-try {
-  importScripts('./mcp-client.js');
-} catch (e) {
-  console.warn('importScripts failed:', e);
+// --- MCP Client Module (Inlined for 0-fetch reliability) ---
+class MCPClient {
+  constructor() {
+    this.tools = new Map();
+    this.registerBuiltInTools();
+  }
+
+  async getTargetTab() {
+    let [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (!tab || tab.url?.startsWith('chrome-extension://')) {
+      const allActive = await chrome.tabs.query({ active: true });
+      tab = allActive.find(t => !t.url?.startsWith('chrome-extension://')) || tab || allActive[0];
+    }
+    return tab;
+  }
+
+  registerBuiltInTools() {
+    this.registerTool({
+      name: 'get_active_tab_info',
+      description: 'Get title and URL of the currently active browser tab.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      handler: async () => {
+        const tab = await this.getTargetTab();
+        if (!tab) return { error: 'Aktif sekme bulunamadı.' };
+        return { id: tab.id, title: tab.title || 'Başlıksız Sekme', url: tab.url || '' };
+      }
+    });
+
+    this.registerTool({
+      name: 'get_page_content',
+      description: 'Extract raw text content from the currently active web page tab.',
+      parameters: {
+        type: 'object',
+        properties: { maxLength: { type: 'number', description: 'Max chars (default 4000).' } },
+        required: []
+      },
+      handler: async (args) => {
+        const maxLen = args?.maxLength || 4000;
+        const tab = await this.getTargetTab();
+        if (!tab?.id) return { error: 'Aktif sekme bulunamadı.' };
+
+        try {
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+              const mainElem = document.querySelector('article, main, #content, .content, .post-content') || document.body;
+              return mainElem?.innerText || document.body?.innerText || '';
+            }
+          });
+          const text = results[0]?.result || '';
+          return { title: tab.title, url: tab.url, content: text.slice(0, maxLen), truncated: text.length > maxLen };
+        } catch (err) {
+          return { error: `Sayfa içeriği okunamadı: ${err.message}` };
+        }
+      }
+    });
+  }
+
+  registerTool(tool) {
+    if (!tool.name || !tool.description || !tool.handler) {
+      throw new Error('Tool name, description, and handler are required.');
+    }
+    this.tools.set(tool.name, tool);
+  }
+
+  getOpenAIToolsSchema() {
+    const list = [];
+    for (const tool of this.tools.values()) {
+      list.push({
+        type: 'function',
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters || { type: 'object', properties: {} }
+        }
+      });
+    }
+    return list.length > 0 ? list : undefined;
+  }
+
+  async executeToolCall(toolName, args = {}) {
+    const tool = this.tools.get(toolName);
+    if (!tool) return { error: `Bilinmeyen araç: ${toolName}` };
+    try {
+      return await tool.handler(args);
+    } catch (error) {
+      return { error: `Araç çalıştırma hatası: ${error.message}` };
+    }
+  }
 }
 
-const mcpClient = typeof globalThis.MCPClient !== 'undefined' ? new globalThis.MCPClient() : null;
+const mcpClient = new MCPClient();
 
 // Open side panel automatically when extension toolbar icon is clicked
 if (chrome.sidePanel?.setPanelBehavior) {
@@ -24,7 +105,7 @@ if (chrome.sidePanel?.setPanelBehavior) {
   });
 }
 
-// 4-Tier Fallback Chain for OpenRouter Default Mode (100% Live Valid OpenRouter IDs)
+// 4-Tier Fallback Chain for OpenRouter Default Mode
 const OPENROUTER_FALLBACK_CHAIN = [
   'openrouter/auto',
   'deepseek/deepseek-chat',
