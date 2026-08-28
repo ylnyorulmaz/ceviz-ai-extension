@@ -1010,6 +1010,20 @@
     const provider = getActiveProvider(providerConfig);
     const requestedModel = resolveTargetModel(anthropicRequest, provider);
 
+    if (!provider.apiKey && globalThis.chrome?.storage?.local) {
+      const extra = await chrome.storage.local.get(['anthropicApiKey', 'openrouterApiKey']);
+      if (extra.openrouterApiKey && provider.id === 'openrouter') {
+        provider.apiKey = extra.openrouterApiKey.trim();
+      } else if (extra.anthropicApiKey && !['custom-provider-key', 'browserking-key'].includes(extra.anthropicApiKey)) {
+        provider.apiKey = extra.anthropicApiKey.trim();
+      }
+    }
+
+    if (!provider.apiKey && provider.id !== 'ollama') {
+      console.warn(`[API Adapter] API Key is missing for active provider: ${provider.id}`);
+      return createAnthropicError(`API Key for ${provider.label || provider.id} is missing or not saved. Please open Extension Settings (Options) -> ${provider.label || provider.id} and click "Save Settings" or "Set Active".`, 401);
+    }
+
     headers.set('Content-Type', 'application/json');
     headers.delete('x-api-key');
     headers.delete('anthropic-version');
@@ -1019,7 +1033,6 @@
 
     if (provider.apiKey) {
       headers.set('Authorization', `Bearer ${provider.apiKey}`);
-      // x-api-key is Anthropic-specific; sending it to OpenAI-compat providers causes 400 errors
     }
 
     if (provider.id === 'openrouter' || (provider.baseUrl && provider.baseUrl.includes('openrouter.ai'))) {

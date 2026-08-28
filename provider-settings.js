@@ -222,10 +222,22 @@
 
     if (action === 'toggle-enabled') {
       providerState.enabled = event.target.checked;
+      persist();
     }
 
     if (action === 'model-select') {
       providerState.model = event.target.value;
+      persist();
+    }
+
+    if (action === 'api-key') {
+      providerState.apiKey = event.target.value.trim();
+      persist();
+    }
+
+    if (action === 'base-url') {
+      providerState.baseUrl = event.target.value.trim();
+      persist();
     }
   });
 
