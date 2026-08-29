@@ -1,7 +1,7 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * Includes Jina AI Reader & Detailed Gemini Nano Chrome Flag Troubleshooting Guide.
+ * Includes Jina AI Reader + Smart Local DOM Fallback (document.body.innerText) for e-commerce & bot-protected sites.
  */
 
 // --- CryptoVault Module (Inlined for 100% Decryption Reliability) ---
@@ -43,7 +43,7 @@ class CryptoVault {
   }
 }
 
-// --- MCP Client Module (Inlined for 0-fetch reliability with Jina AI Reader) ---
+// --- MCP Client Module (Inlined for 0-fetch reliability with Jina AI Reader + DOM Fallback) ---
 class MCPClient {
   constructor() {
     this.tools = new Map();
@@ -73,7 +73,7 @@ class MCPClient {
 
     this.registerTool({
       name: 'get_page_content',
-      description: 'Extract clean markdown content from active web page using Jina AI Reader (https://r.jina.ai/).',
+      description: 'Extract web page content using Jina AI Reader with automatic local DOM (document.body.innerText) fallback.',
       parameters: {
         type: 'object',
         properties: { maxLength: { type: 'number', description: 'Max chars (default 6000).' } },
@@ -84,12 +84,12 @@ class MCPClient {
         const tab = await this.getTargetTab();
         if (!tab?.id || !tab?.url) return { error: 'Aktif sekme veya URL bulunamadı.' };
 
-        // 1. Primary Method: Jina AI Reader (https://r.jina.ai/[URL]) for clean Markdown
+        // 1. Plan A: Try Jina AI Reader (https://r.jina.ai/[URL]) for clean Markdown
         if (tab.url.startsWith('http://') || tab.url.startsWith('https://')) {
           try {
             const jinaUrl = `https://r.jina.ai/${tab.url}`;
             const jinaController = new AbortController();
-            const jinaTimeout = setTimeout(() => jinaController.abort(), 6000);
+            const jinaTimeout = setTimeout(() => jinaController.abort(), 4000);
 
             const jinaResponse = await fetch(jinaUrl, {
               method: 'GET',
@@ -112,13 +112,15 @@ class MCPClient {
                   truncated: markdown.length > maxLen
                 };
               }
+            } else {
+              console.warn(`[Jina AI Reader] Returned status ${jinaResponse.status} for ${tab.url}. Falling back to local DOM scraper...`);
             }
           } catch (jinaErr) {
-            console.warn('[Jina AI Reader Fallback] Jina fetch error:', jinaErr.message);
+            console.warn(`[Jina AI Reader Fallback] Failed (${jinaErr.message}). Switching to local DOM scraper...`);
           }
         }
 
-        // 2. Seamless Fallback: DOM execution if Jina is offline or local page
+        // 2. Plan B: Local DOM Fallback (document.body.innerText) for Amazon, Trendyol, Hepsiburada etc.
         try {
           const scriptPromise = chrome.scripting.executeScript({
             target: { tabId: tab.id },
@@ -129,14 +131,25 @@ class MCPClient {
           });
 
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Sayfa okuma zaman aşımı (3s).')), 3000)
+            setTimeout(() => reject(new Error('Yerel DOM okuma zaman aşımı (3s).')), 3000)
           );
 
           const results = await Promise.race([scriptPromise, timeoutPromise]);
           const text = results[0]?.result || '';
-          return { source: 'dom_scraper', title: tab.title, url: tab.url, content: text.slice(0, maxLen), truncated: text.length > maxLen };
+          return {
+            source: 'dom_scraper',
+            title: tab.title,
+            url: tab.url,
+            content: text.slice(0, maxLen),
+            truncated: text.length > maxLen
+          };
         } catch (err) {
-          return { title: tab?.title || '', url: tab?.url || '', content: `(Sayfa başlığı: ${tab?.title || ''} - URL: ${tab?.url || ''})` };
+          return {
+            source: 'metadata_only',
+            title: tab?.title || '',
+            url: tab?.url || '',
+            content: `(Sayfa başlığı: ${tab?.title || ''} - URL: ${tab?.url || ''})`
+          };
         }
       }
     });
