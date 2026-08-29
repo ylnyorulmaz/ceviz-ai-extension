@@ -1,7 +1,7 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * Includes MathJS Evaluation Tool (math_evaluate) + Live Web Search + Jina AI Reader + Local DOM Fallback.
+ * Includes Context Menus + MathJS Engine + Live Web Search + Jina AI Reader + Local DOM Fallback.
  */
 
 // --- CryptoVault Module (Inlined for 100% Decryption Reliability) ---
@@ -279,6 +279,54 @@ const mcpClient = new MCPClient();
 if (chrome.sidePanel?.setPanelBehavior) {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
     console.warn('Side panel behavior error:', err);
+  });
+}
+
+// Register Right-Click Context Menu items
+chrome.runtime.onInstalled.addListener(() => {
+  if (chrome.contextMenus) {
+    chrome.contextMenus.removeAll(() => {
+      chrome.contextMenus.create({
+        id: 'ceviz_explain',
+        title: '🥜 Ceviz.ai: Seçili Metni Açıkla',
+        contexts: ['selection']
+      });
+      chrome.contextMenus.create({
+        id: 'ceviz_translate',
+        title: '🥜 Ceviz.ai: Türkçeye Çevir',
+        contexts: ['selection']
+      });
+      chrome.contextMenus.create({
+        id: 'ceviz_summarize',
+        title: '🥜 Ceviz.ai: Kısaca Özetle',
+        contexts: ['selection']
+      });
+    });
+  }
+});
+
+// Handle Context Menu clicks
+if (chrome.contextMenus?.onClicked) {
+  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    const selectionText = (info.selectionText || '').trim();
+    if (!selectionText) return;
+
+    if (tab?.id && chrome.sidePanel?.open) {
+      try {
+        await chrome.sidePanel.open({ tabId: tab.id });
+      } catch (err) {}
+    }
+
+    let prompt = '';
+    if (info.menuItemId === 'ceviz_explain') {
+      prompt = `Şu seçili metni detaylıca açıkla: "${selectionText}"`;
+    } else if (info.menuItemId === 'ceviz_translate') {
+      prompt = `Şu metni akıcı ve doğal bir Türkçeye çevir: "${selectionText}"`;
+    } else if (info.menuItemId === 'ceviz_summarize') {
+      prompt = `Şu metni maddeler halinde kısaca özetle: "${selectionText}"`;
+    }
+
+    await chrome.storage.local.set({ pendingPrompt: prompt });
   });
 }
 

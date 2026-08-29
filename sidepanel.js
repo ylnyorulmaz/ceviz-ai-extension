@@ -1,38 +1,139 @@
 /**
- * Ceviz.ai - Side Panel UI Controller (Concise & Compact Side Panel Optimization with KaTeX Math Rendering)
+ * Ceviz.ai - Side Panel UI Controller
  * 
  * Features:
- * 1. KaTeX LaTeX Math Engine ($...$ and $$...$$ automatic formula rendering)
- * 2. Side Panel Optimized System Prompt (Max 2-3 paragraphs / bullet points)
- * 3. Overflow-X Scroll Protection for Code Blocks and Tables
- * 4. Collapsible Details Accordion (Daraltılabilir "▼ Detayları Göster" Kartı)
- * 5. Rich Markdown HTML Renderer
- * 6. Quick Action Chips (📝 Sayfayı Özetle, 🔑 Ana Fikirler, 🎯 3 Önemli Nokta, 🌐 Web'de Ara)
- * 7. Step-by-Step Live Process Status Pill
- * 8. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
- * 9. Feynman ELA Engine & Clarity Progress Bar
+ * 1. Right-Click Context Menu listener & pickup
+ * 2. Chat History Persistence (save & restore from chrome.storage.local)
+ * 3. Export Chat as Markdown (.md) Blob
+ * 4. Drag & Drop File Uploads (.pdf, .txt, .md, .js, .json, .py)
+ * 5. KaTeX LaTeX Math Engine
+ * 6. Side Panel Optimized System Prompt
+ * 7. Overflow-X Scroll Protection & Collapsible Accordion
+ * 8. Quick Action Chips & Feynman ELA Engine
+ * 9. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
  */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const chatBox = document.getElementById('chat-box');
   const userInput = document.getElementById('user-input');
   const sendBtn = document.getElementById('send-btn');
   const settingsBtn = document.getElementById('open-settings');
+  const newChatBtn = document.getElementById('new-chat-btn');
+  const exportChatBtn = document.getElementById('export-chat-btn');
   const quickActions = document.getElementById('quick-actions');
+  const fileInput = document.getElementById('file-input');
 
-  const history = [
-    {
-      role: 'system',
-      content: 'Sen bir tarayıcı yan paneli (Side Panel) asistanısın. Yanıtların her zaman maksimum 2-3 kısa paragraf veya net madde işaretleri (bullet points) şeklinde olsun. Matematiksel denklemler için LaTeX ($...$ veya $$...$$) formatı kullan. Uzun ve boğucu metinlerden kaçın, doğrudan konuya gir.'
-    }
-  ];
+  const INITIAL_SYSTEM_PROMPT = {
+    role: 'system',
+    content: 'Sen bir tarayıcı yan paneli (Side Panel) asistanısın. Yanıtların her zaman maksimum 2-3 kısa paragraf veya net madde işaretleri (bullet points) şeklinde olsun. Matematiksel denklemler için LaTeX ($...$ veya $$...$$) formatı kullan. Uzun ve boğucu metinlerden kaçın, doğrudan konuya gir.'
+  };
 
+  let history = [INITIAL_SYSTEM_PROMPT];
   let lastTopic = 'web sayfasındaki konu';
   let currentUtterance = null;
+
+  // Restore Chat History from local storage if available
+  const savedData = await chrome.storage.local.get(['cevizChatHistory', 'pendingPrompt']);
+  if (savedData.cevizChatHistory && Array.isArray(savedData.cevizChatHistory) && savedData.cevizChatHistory.length > 1) {
+    history = savedData.cevizChatHistory;
+    restoreChatUI(history);
+  }
+
+  // Check if opened from Right-Click Context Menu
+  if (savedData.pendingPrompt) {
+    const promptToRun = savedData.pendingPrompt;
+    await chrome.storage.local.remove('pendingPrompt');
+    setTimeout(() => { sendMessage(promptToRun); }, 300);
+  }
+
+  // Listen for storage changes (Context Menu clicks while sidepanel is already open)
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.pendingPrompt?.newValue) {
+      const promptToRun = changes.pendingPrompt.newValue;
+      chrome.storage.local.remove('pendingPrompt');
+      sendMessage(promptToRun);
+    }
+  });
 
   settingsBtn.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
   });
+
+  // 1. New Chat Button
+  newChatBtn.addEventListener('click', async () => {
+    if (confirm('Sohbet geçmişi temizlenip yeni bir oturum başlatılsın mı?')) {
+      history = [INITIAL_SYSTEM_PROMPT];
+      await chrome.storage.local.remove('cevizChatHistory');
+      chatBox.innerHTML = '<div class="message system">Yeni Ceviz.ai sohbeti başlatıldı.</div>';
+    }
+  });
+
+  // 2. Export Chat Button (.md file)
+  exportChatBtn.addEventListener('click', () => {
+    if (history.length <= 1) {
+      alert('İndirilecek sohbet geçmişi bulunmuyor.');
+      return;
+    }
+
+    let mdText = `# 🥜 Ceviz.ai Sohbet Geçmişi\n*Tarih: ${new Date().toLocaleString('tr-TR')}*\n\n---\n\n`;
+
+    history.forEach(m => {
+      if (m.role === 'user') {
+        mdText += `### 👤 Kullanıcı:\n${m.content}\n\n`;
+      } else if (m.role === 'assistant') {
+        mdText += `### 🤖 Ceviz.ai:\n${m.content}\n\n---\n\n`;
+      }
+    });
+
+    const blob = new Blob([mdText], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ceviz_ai_chat_${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // 3. File Input Listener (.txt, .md, .pdf, .js, .json)
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleUploadedFile(file);
+  });
+
+  // 4. Drag & Drop File Handling on Chat Container
+  chatBox.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    chatBox.classList.add('drag-over');
+  });
+
+  chatBox.addEventListener('dragleave', () => {
+    chatBox.classList.remove('drag-over');
+  });
+
+  chatBox.addEventListener('drop', (e) => {
+    e.preventDefault();
+    chatBox.classList.remove('drag-over');
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleUploadedFile(files[0]);
+    }
+  });
+
+  /**
+   * Reads uploaded file text and submits for AI analysis
+   */
+  function handleUploadedFile(file) {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const fileContent = evt.target.result || '';
+      const prompt = `Yüklenen "${file.name}" dosya içeriğini incele, ana hatlarını ve özeti ver:\n\n\`\`\`\n${fileContent.slice(0, 5000)}\n\`\`\``;
+      sendMessage(prompt);
+    };
+    reader.onerror = () => {
+      appendSystemMessage('❌ Dosya okunamadı.');
+    };
+    reader.readAsText(file);
+  }
 
   // Quick Action Chips Event Delegation
   quickActions.addEventListener('click', (e) => {
@@ -76,6 +177,29 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
+   * Restores UI from saved chat history array
+   */
+  function restoreChatUI(historyArr) {
+    chatBox.innerHTML = '';
+    historyArr.forEach(msg => {
+      if (msg.role === 'user') {
+        appendUserMessage(msg.content, false);
+      } else if (msg.role === 'assistant') {
+        appendAssistantMessage(msg.content, '', false);
+      }
+    });
+  }
+
+  /**
+   * Save chat history to storage
+   */
+  async function persistChatHistory() {
+    try {
+      await chrome.storage.local.set({ cevizChatHistory: history });
+    } catch (e) {}
+  }
+
+  /**
    * Converts raw Markdown syntax into clean HTML with Code Block Scroll Protection (overflow-x: auto)
    */
   function formatMarkdown(text) {
@@ -102,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         continue;
       }
 
-      // Escape raw HTML tags (avoid breaking KaTeX $ math)
+      // Escape raw HTML tags
       line = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
       // Headings: ### Header, ## Header, # Header -> Cool accent headings
@@ -152,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
       history.push({ role: 'user', content: text });
     }
 
+    persistChatHistory();
     sendBtn.disabled = true;
 
     // Step-by-Step Live Process Status Pill
@@ -177,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         appendAssistantMessage(replyRaw, badgeText);
         history.push({ role: 'assistant', content: replyRaw });
+        persistChatHistory();
       } else {
         const errText = response?.error || 'Bir hata oluştu.';
         appendSystemMessage(`❌ Hata: ${errText}`);
@@ -249,7 +375,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
   /**
    * Renders User Message
    */
-  function appendUserMessage(text) {
+  function appendUserMessage(text, doScroll = true) {
     const group = document.createElement('div');
     group.className = 'message-group user';
 
@@ -259,7 +385,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
 
     group.appendChild(msgDiv);
     chatBox.appendChild(group);
-    scrollToBottom();
+    if (doScroll) scrollToBottom();
   }
 
   /**
@@ -277,7 +403,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
   /**
    * Renders Assistant Message with KaTeX LaTeX Rendering, Collapsible Accordion & Code Block Scroll Protection
    */
-  function appendAssistantMessage(replyRaw, badgeText = '') {
+  function appendAssistantMessage(replyRaw, badgeText = '', doScroll = true) {
     const group = document.createElement('div');
     group.className = 'message-group assistant';
 
@@ -487,7 +613,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
     group.appendChild(elaContainer);
 
     chatBox.appendChild(group);
-    scrollToBottom();
+    if (doScroll) scrollToBottom();
   }
 
   function scrollToBottom() {
