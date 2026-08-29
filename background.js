@@ -1,7 +1,7 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * Includes Jina AI Reader + Smart Local DOM Fallback (document.body.innerText) for e-commerce & bot-protected sites.
+ * Includes Live Web Search (Jina Search API https://s.jina.ai/[QUERY]) + Jina AI Reader + Local DOM Fallback.
  */
 
 // --- CryptoVault Module (Inlined for 100% Decryption Reliability) ---
@@ -43,7 +43,7 @@ class CryptoVault {
   }
 }
 
-// --- MCP Client Module (Inlined for 0-fetch reliability with Jina AI Reader + DOM Fallback) ---
+// --- MCP Client Module (Inlined for 0-fetch reliability with Live Web Search) ---
 class MCPClient {
   constructor() {
     this.tools = new Map();
@@ -150,6 +150,52 @@ class MCPClient {
             url: tab?.url || '',
             content: `(Sayfa başlığı: ${tab?.title || ''} - URL: ${tab?.url || ''})`
           };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: 'web_search',
+      description: 'Search the live internet for recent news, up-to-date facts, weather, pricing, or real-time web info using Jina Search API (https://s.jina.ai/).',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'The search query to look up on the live web.' }
+        },
+        required: ['query']
+      },
+      handler: async (args) => {
+        const query = (args?.query || '').trim();
+        if (!query) return { error: 'Arama sorgusu boş olamaz.' };
+
+        try {
+          const searchUrl = `https://s.jina.ai/${encodeURIComponent(query)}`;
+          const searchController = new AbortController();
+          const searchTimeout = setTimeout(() => searchController.abort(), 6000);
+
+          const searchResponse = await fetch(searchUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'text/plain, text/markdown',
+              'X-With-Generated-Alt': 'true'
+            },
+            signal: searchController.signal
+          });
+          clearTimeout(searchTimeout);
+
+          if (searchResponse.ok) {
+            const resultsMarkdown = await searchResponse.text();
+            if (resultsMarkdown && resultsMarkdown.trim().length > 50) {
+              return {
+                source: 'jina_web_search',
+                query: query,
+                results: resultsMarkdown.slice(0, 4500)
+              };
+            }
+          }
+          return { error: 'Arama sonucunda veri bulunamadı.' };
+        } catch (err) {
+          return { error: `Web araması yapılamadı: ${err.message}` };
         }
       }
     });
@@ -488,7 +534,7 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
       throw new Error(`🔑 Yetkilendirme Başarısız (${isGroq ? 'Groq' : 'OpenRouter'} 401): ${detail}. Lütfen Eklenti Ayarlarından (${configName(isGroq)}) API Anahtarınızı kontrol edip tekrar "Ayarları Şifreli Kaydet" butonuna basın.`);
     }
     if (response.status === 403) {
-      throw new Error(`🚫 Erişim Engellendi (${isGroq ? 'Groq' : 'OpenRouter'} 403): ${detail}. Lütfen bakiye ve izinlerinizi kontrol edin.`);
+      throw new Error(`🚫 Erişim Engellendi (${isGroq ? 'Groq' : 'OpenRouter'} 403): ${detail}. Lütfen bakiye meblağ ve izinlerinizi kontrol edin.`);
     }
     if (response.status === 404) {
       throw new Error(`🔍 Model veya Endpoint Bulunamadı (${isGroq ? 'Groq' : 'OpenRouter'} 404 - Model: "${modelToUse}"): ${detail}.`);
@@ -510,9 +556,12 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
   // Handle Tool Calls (MCP Loop)
   if (choiceMessage.tool_calls && choiceMessage.tool_calls.length > 0 && mcpClient) {
     const updatedMessages = [...messages, choiceMessage];
+    let usedWebSearch = false;
 
     for (const toolCall of choiceMessage.tool_calls) {
       const functionName = toolCall.function?.name;
+      if (functionName === 'web_search') usedWebSearch = true;
+
       let args = {};
       try {
         args = JSON.parse(toolCall.function?.arguments || '{}');
@@ -526,6 +575,10 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
         name: functionName,
         content: JSON.stringify(toolResult)
       });
+    }
+
+    if (usedWebSearch) {
+      badgeToUse = '🌐 Canlı Web Araması (Jina Search API) kullanıldı...';
     }
 
     // Recursively call BYOK request with updatedMessages containing tool results
