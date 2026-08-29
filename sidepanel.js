@@ -1,15 +1,16 @@
 /**
- * Ceviz.ai - Side Panel UI Controller (Concise & Compact Side Panel Optimization)
+ * Ceviz.ai - Side Panel UI Controller (Concise & Compact Side Panel Optimization with KaTeX Math Rendering)
  * 
  * Features:
- * 1. Side Panel Optimized System Prompt (Max 2-3 paragraphs / bullet points)
- * 2. Overflow-X Scroll Protection for Code Blocks and Tables
- * 3. Collapsible Details Accordion (Daraltılabilir "▼ Detayları Göster" Kartı)
- * 4. Rich Markdown HTML Renderer (converts raw ## and ** into clean HTML elements)
- * 5. Quick Action Chips (📝 Sayfayı Özetle, 🔑 Ana Fikirler, 🎯 3 Önemli Nokta)
- * 6. Step-by-Step Live Process Status Pill
- * 7. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
- * 8. Feynman ELA Engine & Clarity Progress Bar
+ * 1. KaTeX LaTeX Math Engine ($...$ and $$...$$ automatic formula rendering)
+ * 2. Side Panel Optimized System Prompt (Max 2-3 paragraphs / bullet points)
+ * 3. Overflow-X Scroll Protection for Code Blocks and Tables
+ * 4. Collapsible Details Accordion (Daraltılabilir "▼ Detayları Göster" Kartı)
+ * 5. Rich Markdown HTML Renderer
+ * 6. Quick Action Chips (📝 Sayfayı Özetle, 🔑 Ana Fikirler, 🎯 3 Önemli Nokta, 🌐 Web'de Ara)
+ * 7. Step-by-Step Live Process Status Pill
+ * 8. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
+ * 9. Feynman ELA Engine & Clarity Progress Bar
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -22,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const history = [
     {
       role: 'system',
-      content: 'Sen bir tarayıcı yan paneli (Side Panel) asistanısın. Yanıtların her zaman maksimum 2-3 kısa paragraf veya net madde işaretleri (bullet points) şeklinde olsun. Uzun ve boğucu metinlerden kaçın, doğrudan konuya gir.'
+      content: 'Sen bir tarayıcı yan paneli (Side Panel) asistanısın. Yanıtların her zaman maksimum 2-3 kısa paragraf veya net madde işaretleri (bullet points) şeklinde olsun. Matematiksel denklemler için LaTeX ($...$ veya $$...$$) formatı kullan. Uzun ve boğucu metinlerden kaçın, doğrudan konuya gir.'
     }
   ];
 
@@ -54,6 +55,27 @@ document.addEventListener('DOMContentLoaded', () => {
   sendBtn.addEventListener('click', () => sendMessage());
 
   /**
+   * Helper to trigger KaTeX LaTeX rendering on an HTML element
+   */
+  function triggerKaTeXRender(container) {
+    if (typeof renderMathInElement === 'function' && container) {
+      try {
+        renderMathInElement(container, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true }
+          ],
+          throwOnError: false
+        });
+      } catch (e) {
+        console.warn('KaTeX render error:', e);
+      }
+    }
+  }
+
+  /**
    * Converts raw Markdown syntax into clean HTML with Code Block Scroll Protection (overflow-x: auto)
    */
   function formatMarkdown(text) {
@@ -80,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
         continue;
       }
 
-      // Escape raw HTML tags
+      // Escape raw HTML tags (avoid breaking KaTeX $ math)
       line = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
       // Headings: ### Header, ## Header, # Header -> Cool accent headings
@@ -193,7 +215,7 @@ Constraints:
 
 Word count: Aim for a comprehensive depth of up to 300 words.
 
-Format: Use Markdown for structure (bolding, lists).
+Format: Use Markdown for structure (bolding, lists) and LaTeX ($...$) for any math formulas.
 
 IMPORTANT: Return ONLY a valid JSON object with NO additional text before or after, matching this exact JSON schema:
 {
@@ -253,7 +275,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
   }
 
   /**
-   * Renders Assistant Message with Collapsible Accordion & Code Block Scroll Protection
+   * Renders Assistant Message with KaTeX LaTeX Rendering, Collapsible Accordion & Code Block Scroll Protection
    */
   function appendAssistantMessage(replyRaw, badgeText = '') {
     const group = document.createElement('div');
@@ -295,6 +317,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
         const isOpen = contentDiv.classList.toggle('open');
         toggleBtn.querySelector('span:last-child').textContent = isOpen ? '▲' : '▼';
         toggleBtn.querySelector('span:first-child').textContent = isOpen ? '🔍 Detayları Gizle' : '🔍 Detayların Devamını Göster';
+        triggerKaTeXRender(contentDiv);
       });
 
       accordion.appendChild(toggleBtn);
@@ -303,6 +326,9 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
     } else {
       msgDiv.innerHTML = formatMarkdown(mainText);
     }
+
+    // Trigger KaTeX LaTeX Render on assistant message
+    triggerKaTeXRender(msgDiv);
 
     group.appendChild(msgDiv);
 
@@ -339,7 +365,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
           return;
         }
 
-        const cleanTextForSpeech = mainText.replace(/[*#_`~]/g, '');
+        const cleanTextForSpeech = mainText.replace(/[*#_`~$]/g, '');
         currentUtterance = new SpeechSynthesisUtterance(cleanTextForSpeech);
         currentUtterance.lang = 'tr-TR';
         currentUtterance.rate = 1.0;

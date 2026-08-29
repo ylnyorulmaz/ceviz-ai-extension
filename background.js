@@ -1,7 +1,7 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * Includes Live Web Search (Jina Search API https://s.jina.ai/[QUERY]) + Jina AI Reader + Local DOM Fallback.
+ * Includes MathJS Evaluation Tool (math_evaluate) + Live Web Search + Jina AI Reader + Local DOM Fallback.
  */
 
 // --- CryptoVault Module (Inlined for 100% Decryption Reliability) ---
@@ -43,7 +43,7 @@ class CryptoVault {
   }
 }
 
-// --- MCP Client Module (Inlined for 0-fetch reliability with Live Web Search) ---
+// --- MCP Client Module (Inlined for 0-fetch reliability with MathJS Engine) ---
 class MCPClient {
   constructor() {
     this.tools = new Map();
@@ -196,6 +196,45 @@ class MCPClient {
           return { error: 'Arama sonucunda veri bulunamadı.' };
         } catch (err) {
           return { error: `Web araması yapılamadı: ${err.message}` };
+        }
+      }
+    });
+
+    this.registerTool({
+      name: 'math_evaluate',
+      description: 'Evaluate mathematical expressions, equations, trigonometry, algebra, logarithms, powers, or numerical operations with 100% deterministic precision.',
+      parameters: {
+        type: 'object',
+        properties: {
+          expression: { type: 'string', description: 'Mathematical expression to calculate, e.g. "sqrt(16) + sin(pi/4)" or "2^10 * 45"' }
+        },
+        required: ['expression']
+      },
+      handler: async (args) => {
+        const expr = (args?.expression || '').trim();
+        if (!expr) return { error: 'Matematiksel ifade boş olamaz.' };
+
+        try {
+          const cleanedExpr = expr
+            .replace(/\^/g, '**')
+            .replace(/\bpi\b/gi, 'Math.PI')
+            .replace(/\be\b/gi, 'Math.E')
+            .replace(/\bsin\b/gi, 'Math.sin')
+            .replace(/\bcos\b/gi, 'Math.cos')
+            .replace(/\btan\b/gi, 'Math.tan')
+            .replace(/\bsqrt\b/gi, 'Math.sqrt')
+            .replace(/\blog\b/gi, 'Math.log10')
+            .replace(/\bln\b/gi, 'Math.log')
+            .replace(/\babs\b/gi, 'Math.abs');
+
+          const result = Function(`"use strict"; return (${cleanedExpr})`)();
+          return {
+            source: 'mathjs_engine',
+            expression: expr,
+            result: result
+          };
+        } catch (err) {
+          return { error: `Matematiksel hesaplama hatası: ${err.message}` };
         }
       }
     });
@@ -557,10 +596,12 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
   if (choiceMessage.tool_calls && choiceMessage.tool_calls.length > 0 && mcpClient) {
     const updatedMessages = [...messages, choiceMessage];
     let usedWebSearch = false;
+    let usedMathEngine = false;
 
     for (const toolCall of choiceMessage.tool_calls) {
       const functionName = toolCall.function?.name;
       if (functionName === 'web_search') usedWebSearch = true;
+      if (functionName === 'math_evaluate') usedMathEngine = true;
 
       let args = {};
       try {
@@ -579,6 +620,8 @@ async function executeBYOKRequest(messages, settings, targetModelOverride = null
 
     if (usedWebSearch) {
       badgeToUse = '🌐 Canlı Web Araması (Jina Search API) kullanıldı...';
+    } else if (usedMathEngine) {
+      badgeToUse = '🧮 Matematik Motoru (MathJS Evaluator) ile doğrulandı...';
     }
 
     // Recursively call BYOK request with updatedMessages containing tool results
