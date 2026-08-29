@@ -1,12 +1,13 @@
 /**
- * Ceviz.ai - Side Panel UI Controller
+ * Ceviz.ai - Side Panel UI Controller with Rich Markdown & Cool UI Rendering
  * 
- * Includes:
- * 1. Quick Action Chips (📝 Sayfayı Özetle, 🔑 Ana Fikirler, 🎯 3 Önemli Nokta)
- * 2. Step-by-Step Live Process Status Pill
- * 3. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
- * 4. Feynman ELA Engine (6, 12, 18, 24, 32+ Age Buttons)
- * 5. Clarity Progress Bar & Next Step Chips
+ * Features:
+ * 1. Rich Markdown HTML Renderer (converts raw ## and ** into clean, sleek HTML elements)
+ * 2. Quick Action Chips (📝 Sayfayı Özetle, 🔑 Ana Fikirler, 🎯 3 Önemli Nokta)
+ * 3. Step-by-Step Live Process Status Pill
+ * 4. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
+ * 5. Feynman ELA Engine (6, 12, 18, 24, 32+ Age Buttons)
+ * 6. Clarity Progress Bar & Next Step Chips
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -19,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const history = [
     {
       role: 'system',
-      content: 'Sen Ceviz.ai adında zeki bir web asistanısın. Kullanıcıya net, kısa ve yardımcı yanıtlar ver.'
+      content: 'Sen Ceviz.ai adında zeki ve şık bir web asistanısın. Yanıtlarını kullanıcı dostu, düzenli listeler, emoji vurguları ve temiz bir düzenle ver. Karmaşık ve ham markdown başlıkları (#) yerine şık başlıklar ve maddeler kullan.'
     }
   ];
 
@@ -49,6 +50,52 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   sendBtn.addEventListener('click', () => sendMessage());
+
+  /**
+   * Converts raw Markdown syntax (##, **, -, `code`) into ultra-cool, clean HTML elements
+   */
+  function formatMarkdown(text) {
+    if (!text || typeof text !== 'string') return '';
+
+    // Split lines for clean block-level formatting
+    const lines = text.split('\n');
+    const processedLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+
+      // Escape raw HTML tags
+      line = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      // Headings: ### Header, ## Header, # Header -> Cool accent headings without '#'
+      if (/^###\s+(.*$)/.test(line)) {
+        line = line.replace(/^###\s+(.*$)/, '<h4 style="margin: 10px 0 4px 0; color: #38bdf8; font-size: 0.95rem; font-weight: 700;">$1</h4>');
+      } else if (/^##\s+(.*$)/.test(line)) {
+        line = line.replace(/^##\s+(.*$)/, '<h3 style="margin: 12px 0 6px 0; color: #38bdf8; font-size: 1.05rem; font-weight: 700; border-bottom: 1px solid rgba(56, 189, 248, 0.25); padding-bottom: 4px;">$1</h3>');
+      } else if (/^#\s+(.*$)/.test(line)) {
+        line = line.replace(/^#\s+(.*$)/, '<h2 style="margin: 14px 0 8px 0; color: #38bdf8; font-size: 1.15rem; font-weight: 700;">$1</h2>');
+      }
+
+      // Bullet Lists: - item or * item -> Sleek Bullet list with 🔹 icon
+      if (/^\s*[-*]\s+(.*$)/.test(line)) {
+        line = line.replace(/^\s*[-*]\s+(.*$)/, '<div style="display: flex; gap: 8px; margin: 4px 0; align-items: baseline;"><span style="color: #38bdf8; font-size: 0.8rem; flex-shrink: 0;">🔹</span><span>$1</span></div>');
+      }
+
+      // Bold text: **text** -> Sleek White Bold
+      line = line.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #f8fafc; font-weight: 700;">$1</strong>');
+      line = line.replace(/__(.*?)__/g, '<strong style="color: #f8fafc; font-weight: 700;">$1</strong>');
+
+      // Italic text: *text* -> Muted italic
+      line = line.replace(/\*(.*?)\*/g, '<em style="color: #cbd5e1;">$1</em>');
+
+      // Inline Code: `code` -> Styled code pill
+      line = line.replace(/`(.*?)`/g, '<code style="background: rgba(15, 23, 42, 0.7); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; border: 1px solid rgba(56, 189, 248, 0.2);">$1</code>');
+
+      processedLines.push(line);
+    }
+
+    return processedLines.join('<br>').replace(/(<br>\s*){3,}/g, '<br><br>');
+  }
 
   /**
    * Main function to send message to background Smart Router
@@ -190,7 +237,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
   }
 
   /**
-   * Renders Assistant Message with Copy/TTS Action Bar, ELA Buttons & Clarity Progress Bar
+   * Renders Assistant Message with Rich HTML Markdown, Copy/TTS Action Bar & ELA Buttons
    */
   function appendAssistantMessage(replyRaw, badgeText = '') {
     const group = document.createElement('div');
@@ -207,10 +254,10 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
     const parsedJson = parseJsonResponse(replyRaw);
     const mainText = parsedJson ? parsedJson.explanation : replyRaw;
 
-    // Message Body
+    // Message Body with Rich Markdown HTML Formatting
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message assistant';
-    msgDiv.textContent = mainText;
+    msgDiv.innerHTML = formatMarkdown(mainText);
     group.appendChild(msgDiv);
 
     // Action Bar (Copy & Speech TTS)
