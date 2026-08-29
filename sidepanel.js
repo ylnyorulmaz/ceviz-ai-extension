@@ -1,5 +1,12 @@
 /**
- * Ceviz.ai - Side Panel UI Controller with Feynman ELA Prompt Engine & Rich JSON Rendering
+ * Ceviz.ai - Side Panel UI Controller
+ * 
+ * Includes:
+ * 1. Quick Action Chips (📝 Sayfayı Özetle, 🔑 Ana Fikirler, 🎯 3 Önemli Nokta)
+ * 2. Step-by-Step Live Process Status Pill
+ * 3. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
+ * 4. Feynman ELA Engine (6, 12, 18, 24, 32+ Age Buttons)
+ * 5. Clarity Progress Bar & Next Step Chips
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -7,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const userInput = document.getElementById('user-input');
   const sendBtn = document.getElementById('send-btn');
   const settingsBtn = document.getElementById('open-settings');
+  const quickActions = document.getElementById('quick-actions');
 
   const history = [
     {
@@ -16,9 +24,21 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   let lastTopic = 'web sayfasındaki konu';
+  let currentUtterance = null;
 
   settingsBtn.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
+  });
+
+  // Quick Action Chips Event Delegation
+  quickActions.addEventListener('click', (e) => {
+    const btn = e.target.closest('.quick-btn');
+    if (btn) {
+      const prompt = btn.getAttribute('data-prompt');
+      if (prompt) {
+        sendMessage(prompt);
+      }
+    }
   });
 
   userInput.addEventListener('keydown', (e) => {
@@ -48,7 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     sendBtn.disabled = true;
-    const loadingElem = appendSystemMessage('Ceviz.ai yanıtlıyor...');
+
+    // Step-by-Step Live Process Status Pill
+    const loadingElem = appendSystemMessage('🌐 Jina AI ile sayfa içeriği okunuyor...');
+    const statusTimer = setTimeout(() => {
+      if (loadingElem && loadingElem.isConnected) {
+        loadingElem.textContent = '🧠 Yapay zeka yanıt üretiyor...';
+      }
+    }, 1400);
 
     try {
       const response = await chrome.runtime.sendMessage({
@@ -56,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messages: history
       });
 
+      clearTimeout(statusTimer);
       loadingElem.remove();
 
       if (response?.success) {
@@ -69,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appendSystemMessage(`❌ Hata: ${errText}`);
       }
     } catch (err) {
+      clearTimeout(statusTimer);
       loadingElem.remove();
       appendSystemMessage(`❌ Hata: ${err.message}`);
     } finally {
@@ -113,7 +142,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
   }
 
   /**
-   * Helper to parse JSON from AI response (including markdown ```json ... ``` blocks)
+   * Helper to parse JSON from AI response
    */
   function parseJsonResponse(rawText) {
     if (!rawText || typeof rawText !== 'string') return null;
@@ -161,7 +190,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
   }
 
   /**
-   * Renders Assistant Message with ELA Buttons, Clarity Score, and Next Logical Steps
+   * Renders Assistant Message with Copy/TTS Action Bar, ELA Buttons & Clarity Progress Bar
    */
   function appendAssistantMessage(replyRaw, badgeText = '') {
     const group = document.createElement('div');
@@ -183,6 +212,64 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
     msgDiv.className = 'message assistant';
     msgDiv.textContent = mainText;
     group.appendChild(msgDiv);
+
+    // Action Bar (Copy & Speech TTS)
+    const actionBar = document.createElement('div');
+    actionBar.className = 'action-bar';
+
+    // 1. Copy Button
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'action-btn';
+    copyBtn.innerHTML = '📋 Kopyala';
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(mainText);
+        copyBtn.innerHTML = '✅ Kopyalandı';
+        setTimeout(() => { copyBtn.innerHTML = '📋 Kopyala'; }, 2000);
+      } catch (err) {
+        copyBtn.innerHTML = '❌ Hata';
+      }
+    });
+
+    // 2. Text-to-Speech (TTS) Button
+    const ttsBtn = document.createElement('button');
+    ttsBtn.type = 'button';
+    ttsBtn.className = 'action-btn';
+    ttsBtn.innerHTML = '🔊 Sesli Oku';
+
+    ttsBtn.addEventListener('click', () => {
+      if ('speechSynthesis' in window) {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+          ttsBtn.innerHTML = '🔊 Sesli Oku';
+          return;
+        }
+
+        const cleanTextForSpeech = mainText.replace(/[*#_`~]/g, '');
+        currentUtterance = new SpeechSynthesisUtterance(cleanTextForSpeech);
+        currentUtterance.lang = 'tr-TR';
+        currentUtterance.rate = 1.0;
+
+        currentUtterance.onstart = () => {
+          ttsBtn.innerHTML = '⏹️ Durdur';
+        };
+        currentUtterance.onend = () => {
+          ttsBtn.innerHTML = '🔊 Sesli Oku';
+        };
+        currentUtterance.onerror = () => {
+          ttsBtn.innerHTML = '🔊 Sesli Oku';
+        };
+
+        window.speechSynthesis.speak(currentUtterance);
+      } else {
+        alert('Tarayıcınız sesli okuma özelliğini desteklemiyor.');
+      }
+    });
+
+    actionBar.appendChild(copyBtn);
+    actionBar.appendChild(ttsBtn);
+    group.appendChild(actionBar);
 
     // Render Clarity Score Progress Bar if present in JSON
     if (parsedJson && typeof parsedJson.clarityScore === 'number') {
