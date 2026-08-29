@@ -1,7 +1,7 @@
 /**
  * Ceviz.ai - Background Service Worker (Manifest V3)
  * 
- * Includes Jina AI Reader (https://r.jina.ai/[URL]) Integration for pristine Markdown extraction.
+ * Includes Jina AI Reader & Detailed Gemini Nano Chrome Flag Troubleshooting Guide.
  */
 
 // --- CryptoVault Module (Inlined for 100% Decryption Reliability) ---
@@ -217,6 +217,20 @@ ${reason ? `*Durum: ${reason}*\n\n` : ''}Gemini Nano'yu tarayıcınızda sıfır
 2. **\`#optimization-guide-on-device-model\`** bayrağını bulun ➔ **\`Enabled Bypassperfrequirement\`** seçin.
 3. **\`#prompt-api-for-gemini-nano\`** bayrağını bulun ➔ **\`Enabled\`** seçin.
 4. Sayfanın altındaki **Relaunch (Yeniden Başlat)** butonuna tıklayarak Chrome'u yeniden başlatın.
+
+---
+
+### 🔍 Bayrakları Bulamıyorsanız (İpuçları):
+Google, Chrome sürümleri (Stable, Beta, Dev, Canary) arasında bayrak isimlerini güncelleyebilir:
+
+1. **Arama Çubuğunda Kelimelerle Aratın:**
+   - **\`chrome://flags\`** arama çubuğuna şu kelimeleri yazıp arayın:
+     - **\`Optimization Guide\`**
+     - **\`On-Device Model\`**
+     - **\`Prompt API\`**
+2. **Chrome Sürümünüzü Kontrol Edin:**
+   - Standart (Stable) Chrome sürümünde bu bayraklar henüz bölgenizde görünmeyebilir.
+   - En güncel yerleşik yapay zeka özelliklerini sorunsuz kullanmak için **Chrome Dev** veya **Chrome Canary** sürümünü indirip deneyebilirsiniz.
 
 ---
 
