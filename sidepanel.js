@@ -1,13 +1,15 @@
 /**
- * Ceviz.ai - Side Panel UI Controller with Rich Markdown & Cool UI Rendering
+ * Ceviz.ai - Side Panel UI Controller (Concise & Compact Side Panel Optimization)
  * 
  * Features:
- * 1. Rich Markdown HTML Renderer (converts raw ## and ** into clean, sleek HTML elements)
- * 2. Quick Action Chips (📝 Sayfayı Özetle, 🔑 Ana Fikirler, 🎯 3 Önemli Nokta)
- * 3. Step-by-Step Live Process Status Pill
- * 4. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
- * 5. Feynman ELA Engine (6, 12, 18, 24, 32+ Age Buttons)
- * 6. Clarity Progress Bar & Next Step Chips
+ * 1. Side Panel Optimized System Prompt (Max 2-3 paragraphs / bullet points)
+ * 2. Overflow-X Scroll Protection for Code Blocks and Tables
+ * 3. Collapsible Details Accordion (Daraltılabilir "▼ Detayları Göster" Kartı)
+ * 4. Rich Markdown HTML Renderer (converts raw ## and ** into clean HTML elements)
+ * 5. Quick Action Chips (📝 Sayfayı Özetle, 🔑 Ana Fikirler, 🎯 3 Önemli Nokta)
+ * 6. Step-by-Step Live Process Status Pill
+ * 7. One-Click Copy & Text-to-Speech (TTS Audio) Buttons
+ * 8. Feynman ELA Engine & Clarity Progress Bar
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -20,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const history = [
     {
       role: 'system',
-      content: 'Sen Ceviz.ai adında zeki ve şık bir web asistanısın. Yanıtlarını kullanıcı dostu, düzenli listeler, emoji vurguları ve temiz bir düzenle ver. Karmaşık ve ham markdown başlıkları (#) yerine şık başlıklar ve maddeler kullan.'
+      content: 'Sen bir tarayıcı yan paneli (Side Panel) asistanısın. Yanıtların her zaman maksimum 2-3 kısa paragraf veya net madde işaretleri (bullet points) şeklinde olsun. Uzun ve boğucu metinlerden kaçın, doğrudan konuya gir.'
     }
   ];
 
@@ -52,33 +54,47 @@ document.addEventListener('DOMContentLoaded', () => {
   sendBtn.addEventListener('click', () => sendMessage());
 
   /**
-   * Converts raw Markdown syntax (##, **, -, `code`) into ultra-cool, clean HTML elements
+   * Converts raw Markdown syntax into clean HTML with Code Block Scroll Protection (overflow-x: auto)
    */
   function formatMarkdown(text) {
     if (!text || typeof text !== 'string') return '';
 
-    // Split lines for clean block-level formatting
-    const lines = text.split('\n');
+    let htmlText = text;
+
+    // Code Blocks Handling (```lang ... ```) with overflow-x scroll container
+    htmlText = htmlText.replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/gim, (match, lang, code) => {
+      const cleanCode = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const langName = lang ? lang.toUpperCase() : 'KOD';
+      return `<div class="code-block-container"><div class="code-block-header"><span>💻 ${langName}</span><span>overflow-x: auto</span></div><pre class="code-block-content">${cleanCode}</pre></div>`;
+    });
+
+    const lines = htmlText.split('\n');
     const processedLines = [];
 
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
 
+      // If line is already inside code block container, preserve it
+      if (line.includes('class="code-block-container"') || line.includes('class="code-block-content"') || line.includes('class="code-block-header"')) {
+        processedLines.push(line);
+        continue;
+      }
+
       // Escape raw HTML tags
       line = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-      // Headings: ### Header, ## Header, # Header -> Cool accent headings without '#'
+      // Headings: ### Header, ## Header, # Header -> Cool accent headings
       if (/^###\s+(.*$)/.test(line)) {
-        line = line.replace(/^###\s+(.*$)/, '<h4 style="margin: 10px 0 4px 0; color: #38bdf8; font-size: 0.95rem; font-weight: 700;">$1</h4>');
+        line = line.replace(/^###\s+(.*$)/, '<h4 style="margin: 8px 0 4px 0; color: #38bdf8; font-size: 0.95rem; font-weight: 700;">$1</h4>');
       } else if (/^##\s+(.*$)/.test(line)) {
-        line = line.replace(/^##\s+(.*$)/, '<h3 style="margin: 12px 0 6px 0; color: #38bdf8; font-size: 1.05rem; font-weight: 700; border-bottom: 1px solid rgba(56, 189, 248, 0.25); padding-bottom: 4px;">$1</h3>');
+        line = line.replace(/^##\s+(.*$)/, '<h3 style="margin: 10px 0 4px 0; color: #38bdf8; font-size: 1.02rem; font-weight: 700; border-bottom: 1px solid rgba(56, 189, 248, 0.25); padding-bottom: 3px;">$1</h3>');
       } else if (/^#\s+(.*$)/.test(line)) {
-        line = line.replace(/^#\s+(.*$)/, '<h2 style="margin: 14px 0 8px 0; color: #38bdf8; font-size: 1.15rem; font-weight: 700;">$1</h2>');
+        line = line.replace(/^#\s+(.*$)/, '<h2 style="margin: 12px 0 6px 0; color: #38bdf8; font-size: 1.1rem; font-weight: 700;">$1</h2>');
       }
 
       // Bullet Lists: - item or * item -> Sleek Bullet list with 🔹 icon
       if (/^\s*[-*]\s+(.*$)/.test(line)) {
-        line = line.replace(/^\s*[-*]\s+(.*$)/, '<div style="display: flex; gap: 8px; margin: 4px 0; align-items: baseline;"><span style="color: #38bdf8; font-size: 0.8rem; flex-shrink: 0;">🔹</span><span>$1</span></div>');
+        line = line.replace(/^\s*[-*]\s+(.*$)/, '<div style="display: flex; gap: 8px; margin: 3px 0; align-items: baseline;"><span style="color: #38bdf8; font-size: 0.78rem; flex-shrink: 0;">🔹</span><span>$1</span></div>');
       }
 
       // Bold text: **text** -> Sleek White Bold
@@ -89,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
       line = line.replace(/\*(.*?)\*/g, '<em style="color: #cbd5e1;">$1</em>');
 
       // Inline Code: `code` -> Styled code pill
-      line = line.replace(/`(.*?)`/g, '<code style="background: rgba(15, 23, 42, 0.7); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; border: 1px solid rgba(56, 189, 248, 0.2);">$1</code>');
+      line = line.replace(/`(.*?)`/g, '<code style="background: rgba(15, 23, 42, 0.7); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.82rem; border: 1px solid rgba(56, 189, 248, 0.2);">$1</code>');
 
       processedLines.push(line);
     }
@@ -175,7 +191,7 @@ Age 32+: Executive level. Focus on strategic impact, efficiency, long-term ROI, 
 
 Constraints:
 
-Word count: Aim for a comprehensive depth of up to 400 words.
+Word count: Aim for a comprehensive depth of up to 300 words.
 
 Format: Use Markdown for structure (bolding, lists).
 
@@ -237,7 +253,7 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
   }
 
   /**
-   * Renders Assistant Message with Rich HTML Markdown, Copy/TTS Action Bar & ELA Buttons
+   * Renders Assistant Message with Collapsible Accordion & Code Block Scroll Protection
    */
   function appendAssistantMessage(replyRaw, badgeText = '') {
     const group = document.createElement('div');
@@ -254,10 +270,40 @@ IMPORTANT: Return ONLY a valid JSON object with NO additional text before or aft
     const parsedJson = parseJsonResponse(replyRaw);
     const mainText = parsedJson ? parsedJson.explanation : replyRaw;
 
-    // Message Body with Rich Markdown HTML Formatting
+    // Message Body with Collapsible Accordion for Long Responses (>750 chars)
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message assistant';
-    msgDiv.innerHTML = formatMarkdown(mainText);
+
+    if (mainText.length > 750) {
+      const summaryPart = mainText.slice(0, 450);
+      const detailPart = mainText.slice(450);
+
+      msgDiv.innerHTML = formatMarkdown(summaryPart);
+
+      const accordion = document.createElement('div');
+      accordion.className = 'details-accordion';
+
+      const toggleBtn = document.createElement('div');
+      toggleBtn.className = 'accordion-toggle';
+      toggleBtn.innerHTML = '<span>🔍 Detayların Devamını Göster</span><span>▼</span>';
+
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'accordion-content';
+      contentDiv.innerHTML = formatMarkdown(detailPart);
+
+      toggleBtn.addEventListener('click', () => {
+        const isOpen = contentDiv.classList.toggle('open');
+        toggleBtn.querySelector('span:last-child').textContent = isOpen ? '▲' : '▼';
+        toggleBtn.querySelector('span:first-child').textContent = isOpen ? '🔍 Detayları Gizle' : '🔍 Detayların Devamını Göster';
+      });
+
+      accordion.appendChild(toggleBtn);
+      accordion.appendChild(contentDiv);
+      msgDiv.appendChild(accordion);
+    } else {
+      msgDiv.innerHTML = formatMarkdown(mainText);
+    }
+
     group.appendChild(msgDiv);
 
     // Action Bar (Copy & Speech TTS)

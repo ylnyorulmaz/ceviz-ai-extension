@@ -78,7 +78,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-width: 92%;
+      max-width: 96%;
     }
 
     .message-group.user {
@@ -89,6 +89,7 @@
     .message-group.assistant {
       align-self: flex-start;
       align-items: flex-start;
+      width: 100%;
     }
 
     .message {
@@ -97,7 +98,10 @@
       font-size: 0.92rem;
       line-height: 1.5;
       word-break: break-word;
+      overflow-wrap: break-word;
       white-space: pre-wrap;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .message.user {
@@ -110,6 +114,7 @@
       background: var(--ai-msg-bg);
       color: var(--text);
       border-bottom-left-radius: 2px;
+      width: 100%;
     }
 
     .message.system {
@@ -139,6 +144,78 @@
       border-radius: 6px;
       font-size: 0.75rem;
       border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    /* Code Blocks Container with Horizontal Scroll Protection */
+    .code-block-container {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 8px 0;
+      max-width: 100%;
+      overflow-x: auto;
+      box-sizing: border-box;
+    }
+
+    .code-block-header {
+      background: #1e293b;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      color: var(--accent);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .code-block-content {
+      padding: 10px;
+      font-family: Consolas, Monaco, 'Andale Mono', monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 0;
+    }
+
+    /* Collapsible Details Accordion */
+    .details-accordion {
+      margin-top: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      overflow: hidden;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .accordion-toggle {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent);
+      padding: 8px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+      transition: background 0.2s;
+    }
+
+    .accordion-toggle:hover {
+      background: rgba(56, 189, 248, 0.2);
+    }
+
+    .accordion-content {
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      border-top: 1px solid rgba(56, 189, 248, 0.15);
+      display: none;
+    }
+
+    .accordion-content.open {
+      display: block;
     }
 
     /* Action Buttons (Copy & TTS) */
